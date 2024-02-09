@@ -10,6 +10,8 @@ private:
 
 	LPSTR utf16Text = "";
 	bool utf16Enabled = false;
+
+	std::wstring apiFile = L"";
 public:
 	static StateManager& getInstance();
 	void setHInstance(HINSTANCE hInstance);
@@ -20,4 +22,7 @@ public:
 
 	void setUtf16Enabled(bool utf16Enabled);
 	bool getUtf16Enabled();
+
+	void setApiFile(std::wstring apiFile);
+	std::wstring getApiFile();
 };

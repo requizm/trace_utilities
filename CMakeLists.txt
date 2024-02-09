@@ -48,10 +48,12 @@ include("cmake/x64dbg.cmake")
 
 # Target: PluginTemplate
 set(PluginTemplate_SOURCES
+	"src/Config.cpp"
 	"src/ManagerDialog.cpp"
 	"src/StateManager.cpp"
 	"src/plugin.cpp"
 	"src/pluginmain.cpp"
+	"src/Config.h"
 	"src/ManagerDialog.h"
 	"src/StateManager.h"
 	"src/plugin.h"
@@ -65,4 +67,11 @@ x64dbg_plugin(PluginTemplate)
 
 target_sources(PluginTemplate PRIVATE ${PluginTemplate_SOURCES})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PluginTemplate_SOURCES})
+
+set_target_properties(PluginTemplate PROPERTIES
+	CXX_STANDARD
+		17
+	CXX_STANDARD_REQUIRED
+		ON
+)
 

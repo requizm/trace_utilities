@@ -3,6 +3,7 @@
 #include "resource.h"
 #include <stdio.h>
 #include "pluginmain.h"
+#include "Config.h"
 
 INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -23,10 +24,14 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		switch (LOWORD(wParam))
 		{
 		case TRACE_B_OK:
-			LPSTR utf16Text = new char[100];
+			LPSTR utf16Text = new char[256];
 			if (GetDlgItemText(hwndDlg, TRACE_T_UTF16, utf16Text, 100)) {
 				StateManager::getInstance().setUtf16Text(utf16Text);
 				StateManager::getInstance().setUtf16Enabled(IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED);
+				Config config;
+				config.utf16Enabled = StateManager::getInstance().getUtf16Enabled();
+				strcpy(config.utf16Text, utf16Text);
+				saveConfig(config);
 				DestroyWindow(hwndDlg);
 				return true;
 			}

@@ -35,3 +35,13 @@ bool StateManager::getUtf16Enabled()
 {
 	return utf16Enabled;
 }
+
+void StateManager::setApiFile(std::wstring apiFile)
+{
+	this->apiFile = apiFile;
+}
+
+std::wstring StateManager::getApiFile()
+{
+	return apiFile;
+}

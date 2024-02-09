@@ -25,3 +25,7 @@ sources = [
     "src/*.h",
     "src/*.rc",
 ]
+
+[target.PluginTemplate.properties]
+CXX_STANDARD = "17"
+CXX_STANDARD_REQUIRED = true

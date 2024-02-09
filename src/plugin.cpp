@@ -2,6 +2,8 @@
 #include <windows.h>
 #include "StateManager.h"
 #include "ManagerDialog.h"
+#include "Config.h"
+#include <filesystem>
 
 bool utf16Search(ULONG_PTR addr, wchar_t* str, int strLen)
 {
@@ -133,6 +135,9 @@ void cbInitDebug(CBTYPE cbType, void* arg)
 	// dprintf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
 }
 
+#define EXPAND(x) L##x
+#define DOWIDEN(x) EXPAND(x)
+
 // Initialize your plugin data here.
 bool pluginInit(PLUG_INITSTRUCT* initStruct)
 {
@@ -147,10 +152,18 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct)
 		_plugin_logprintf("Failed to register special.search\n");
 	}
 
-	// HINSTANCE hInstance = StateManager::getInstance().getHInstance();
-	// _plugin_logprintf("hInstance = %p\n", hInstance);
+	std::wstring apiFile = StateManager::getInstance().getApiFile();
 
-	// ManagerDialog *manager = new ManagerDialog();
+	GetModuleFileNameW(StateManager::getInstance().getHInstance(), &apiFile[0], apiFile.size());
+	std::filesystem::path filePath(apiFile);
+	filePath.remove_filename();
+	filePath /= std::wstring(DOWIDEN(PLUGIN_NAME)) + L".ini";
+	apiFile = filePath.wstring();
+	StateManager::getInstance().setApiFile(apiFile);
+	_plugin_logprintf("apiFile = %ls\n", apiFile.c_str());
+	_plugin_logprintf("apiFile = %ls\n", apiFile.c_str());
+	_plugin_logprintf("apiFile = %ls\n", apiFile.c_str());
+	loadConfig();
 
 	// Return false to cancel loading the plugin.
 	return true;
