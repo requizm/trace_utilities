@@ -3,7 +3,7 @@
 #include "StateManager.h"
 #include "ManagerDialog.h"
 
-bool utf16Search(ULONG_PTR addr, wchar_t *str, int strLen)
+bool utf16Search(ULONG_PTR addr, wchar_t* str, int strLen)
 {
 	// dprintf("utf16Search(%p, %p, %d)\n", addr, str, strLen);
 	if (!DbgMemIsValidReadPtr(addr))
@@ -12,10 +12,10 @@ bool utf16Search(ULONG_PTR addr, wchar_t *str, int strLen)
 		return false;
 	}
 
-	wchar_t *wchar = new wchar_t[strLen];
+	wchar_t* wchar = new wchar_t[strLen];
 	DbgMemRead(addr, wchar, strLen * sizeof(wchar_t));
 
-	wchar_t *nullTerminatedP = new wchar_t[strLen + 1];
+	wchar_t* nullTerminatedP = new wchar_t[strLen + 1];
 	memcpy(nullTerminatedP, wchar, strLen * sizeof(wchar_t));
 	nullTerminatedP[strLen] = 0;
 
@@ -34,10 +34,10 @@ bool utf16Search(ULONG_PTR addr, wchar_t *str, int strLen)
 			// dprintf("Seems to be a pointer to a string at %p in 0x%p\n", addrP, addr);
 			if (DbgMemIsValidReadPtr((duint)addrP))
 			{
-				wchar_t *wcharP = new wchar_t[strLen];
+				wchar_t* wcharP = new wchar_t[strLen];
 				DbgMemRead((duint)addrP, wcharP, strLen * sizeof(wchar_t));
 
-				wchar_t *nullTerminatedPP = new wchar_t[strLen + 1];
+				wchar_t* nullTerminatedPP = new wchar_t[strLen + 1];
 				memcpy(nullTerminatedPP, wcharP, strLen * sizeof(wchar_t));
 				nullTerminatedPP[strLen] = 0;
 
@@ -64,15 +64,15 @@ bool utf16Search(ULONG_PTR addr, wchar_t *str, int strLen)
 	return result;
 }
 
-static wchar_t *charToWChar(const char *text)
+static wchar_t* charToWChar(const char* text)
 {
 	const size_t size = strlen(text) + 1;
-	wchar_t *wText = new wchar_t[size];
+	wchar_t* wText = new wchar_t[size];
 	mbstowcs(wText, text, size);
 	return wText;
 }
 
-static bool utf16SearchCommand(int argc, char **argv)
+static bool utf16SearchCommand(int argc, char** argv)
 {
 	dprintf("utf16SearchCommand(%d, %p)\n", argc, argv);
 	if (argc < 2)
@@ -81,14 +81,14 @@ static bool utf16SearchCommand(int argc, char **argv)
 		return false;
 	}
 
-	wchar_t *searchStr = charToWChar(argv[1]);
+	wchar_t* searchStr = charToWChar(argv[1]);
 	int len = wcslen(searchStr);
 	dprintf("searchStr = %p, len = %d\n", searchStr, len);
 
 	REGDUMP regdump;
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
 
-	auto &r = regdump.regcontext;
+	auto& r = regdump.regcontext;
 #ifdef _WIN64
 	if (utf16Search(r.cax, searchStr, len) || utf16Search(r.cbx, searchStr, len) || utf16Search(r.ccx, searchStr, len) || utf16Search(r.cdx, searchStr, len) || utf16Search(r.csi, searchStr, len) || utf16Search(r.cdi, searchStr, len) || utf16Search(r.cip, searchStr, len) || utf16Search(r.csp, searchStr, len) || utf16Search(r.cbp, searchStr, len))
 	{
@@ -112,7 +112,7 @@ static bool utf16SearchCommand(int argc, char **argv)
 	return true;
 }
 
-static duint utf16SearchFunction(int argc, const duint *argv, void *userdata)
+static duint utf16SearchFunction(int argc, const duint* argv, void* userdata)
 {
 	dprintf("utf16SearchFunction(%d, %p, %p)\n", argc, argv, userdata);
 	if (argc < 2)
@@ -128,13 +128,13 @@ static duint utf16SearchFunction(int argc, const duint *argv, void *userdata)
 	return 1;
 }
 
-void cbInitDebug(CBTYPE cbType, void *arg)
+void cbInitDebug(CBTYPE cbType, void* arg)
 {
 	// dprintf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
 }
 
 // Initialize your plugin data here.
-bool pluginInit(PLUG_INITSTRUCT *initStruct)
+bool pluginInit(PLUG_INITSTRUCT* initStruct)
 {
 	dprintf("pluginInit(pluginHandle: %d)\n", pluginHandle);
 
@@ -167,49 +167,46 @@ void pluginStop()
 	dprintf("pluginStop(pluginHandle: %d)\n", pluginHandle);
 }
 
-#define MENU_MAIN 0
-#define MENU_OPTIONS 1
+#define MENU_OPTIONS 0
 
 // Do GUI/Menu related things here.
 // This code runs on the GUI thread: GetCurrentThreadId() == GuiGetMainThreadId()
 // You can get the HWND using GuiGetWindowHandle()
 void pluginSetup()
 {
-	// Prefix of the functions to call here: _plugin_menu
-
-	_plugin_menuaddentry(hMenu, MENU_MAIN, "&Trace Utils");
 	_plugin_menuaddentry(hMenu, MENU_OPTIONS, "&Options");
 
 	dprintf("pluginSetup(pluginHandle: %d)\n", pluginHandle);
 }
 
-PLUG_EXPORT CDECL void CBMENUENTRY(CBTYPE cbType, void *callbackInfo)
+PLUG_EXPORT CDECL void CBMENUENTRY(CBTYPE cbType, void* callbackInfo)
 {
-	PLUG_CB_MENUENTRY *info = (PLUG_CB_MENUENTRY *)callbackInfo;
+	PLUG_CB_MENUENTRY* info = (PLUG_CB_MENUENTRY*)callbackInfo;
 
 	switch (info->hEntry)
 	{
-	case MENU_MAIN:
-		_plugin_logprintf("main\n");
-		break;
-
 	case MENU_OPTIONS:
-		_plugin_logprintf("options\n");
-		ManagerDialog *manager = new ManagerDialog();
+		ManagerDialog* manager = new ManagerDialog();
 		break;
 	}
 }
 
-PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE *info)
+PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info)
 {
-	// dprintf("CBTRACEEXECUTE(cbType=%d, info=%p)\n", cbType, info);
-	wchar_t *searchStr = L"A debug";
+	StateManager& stateManager = StateManager::getInstance();
+	if (!stateManager.getUtf16Enabled())
+	{
+		return;
+	}
+
+	char* searchCharStr = stateManager.getUtf16Text();
+	wchar_t* searchStr = charToWChar(searchCharStr);
 	int len = wcslen(searchStr);
 
 	REGDUMP regdump;
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
 
-	auto &r = regdump.regcontext;
+	auto& r = regdump.regcontext;
 #ifdef _WIN64
 	// Check each register
 	if (utf16Search(r.cax, searchStr, len) || utf16Search(r.cbx, searchStr, len) || utf16Search(r.ccx, searchStr, len) || utf16Search(r.cdx, searchStr, len) || utf16Search(r.csi, searchStr, len) || utf16Search(r.cdi, searchStr, len) || utf16Search(r.cip, searchStr, len) || utf16Search(r.csp, searchStr, len) || utf16Search(r.cbp, searchStr, len))
