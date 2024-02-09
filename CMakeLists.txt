@@ -57,6 +57,7 @@ set(PluginTemplate_SOURCES
 	"src/plugin.h"
 	"src/pluginmain.h"
 	"src/resource.h"
+	"src/PluginTemplate.rc"
 	cmake.toml
 )
 

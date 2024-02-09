@@ -173,11 +173,9 @@ void pluginStop()
 // Do GUI/Menu related things here.
 // This code runs on the GUI thread: GetCurrentThreadId() == GuiGetMainThreadId()
 // You can get the HWND using GuiGetWindowHandle()
-PLUG_EXPORT void plugsetup(PLUG_SETUPSTRUCT *setupStruct)
+void pluginSetup()
 {
 	// Prefix of the functions to call here: _plugin_menu
-	hMenu = setupStruct->hMenu;
-	hMenuDisasm = setupStruct->hMenuDisasm;
 
 	_plugin_menuaddentry(hMenu, MENU_MAIN, "&Trace Utils");
 	_plugin_menuaddentry(hMenu, MENU_OPTIONS, "&Options");

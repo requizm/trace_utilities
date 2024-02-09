@@ -23,4 +23,5 @@ type = "plugin"
 sources = [
     "src/*.cpp",
     "src/*.h",
+    "src/*.rc",
 ]

@@ -6,7 +6,7 @@
 
 ManagerDialog::ManagerDialog()
 {
-    this->hwnd = CreateDialog(StateManager::getInstance().getHInstance(), MAKEINTRESOURCE(IDD_DIALOG_HITS), GuiGetWindowHandle(), NULL);
+    this->hwnd = CreateDialog(StateManager::getInstance().getHInstance(), MAKEINTRESOURCE(IDD_DIALOG111), GuiGetWindowHandle(), NULL);
     char title[100];
     snprintf(title, sizeof(title), "Manager");
     SetWindowText(this->hwnd, title);
