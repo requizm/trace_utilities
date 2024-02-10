@@ -4,5 +4,4 @@
 
 //functions
 bool pluginInit(PLUG_INITSTRUCT* initStruct);
-void pluginStop();
 void pluginSetup();

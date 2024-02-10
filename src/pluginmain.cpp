@@ -25,7 +25,7 @@ PLUG_EXPORT bool pluginit(PLUG_INITSTRUCT* initStruct)
 
 PLUG_EXPORT bool plugstop()
 {
-    pluginStop();
+    //pluginStop();
     return true;
 }
 

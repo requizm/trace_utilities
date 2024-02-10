@@ -16,26 +16,23 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_INITDIALOG:
 	{
-		SetDlgItemTextW(hwndDlg, TRACE_T_UTF16, StateManager::getInstance().getUtf16Text().c_str());
-		CheckDlgButton(hwndDlg, TRACE_C_ENABLED, StateManager::getInstance().getUtf16Enabled() ? BST_CHECKED : BST_UNCHECKED);
+		StateManager& instance = StateManager::getInstance();
+		SetDlgItemTextW(hwndDlg, TRACE_T_UTF16, instance.getConfig().utf16Text.c_str());
+		CheckDlgButton(hwndDlg, TRACE_C_ENABLED, instance.getConfig().utf16Enabled ? BST_CHECKED : BST_UNCHECKED);
+		CheckDlgButton(hwndDlg, TRACE_C_LOG, instance.getConfig().loggingEnabled ? BST_CHECKED : BST_UNCHECKED);
 		return true;
 	}
 	case WM_COMMAND:
 		switch (LOWORD(wParam))
 		{
 		case TRACE_B_OK:
-			std::wstring utf16Text = std::wstring(256, L'\0');
-			if (GetDlgItemTextW(hwndDlg, TRACE_T_UTF16, &utf16Text[0], 256)) {
-				StateManager::getInstance().setUtf16Text(utf16Text);
-				StateManager::getInstance().setUtf16Enabled(IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED);
-				Config config;
-				config.utf16Enabled = StateManager::getInstance().getUtf16Enabled();
-				config.utf16Text = StateManager::getInstance().getUtf16Text();
-				saveConfig(config);
-				DestroyWindow(hwndDlg);
-				return true;
-			}
-			_plugin_logprintf("GetDlgItemText failed\n");
+			StateManager& instance = StateManager::getInstance();
+			GetDlgItemTextW(hwndDlg, TRACE_T_UTF16, &instance.getConfig().utf16Text[0], 256);
+			instance.getConfig().utf16Enabled = IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED;
+			instance.getConfig().loggingEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_LOG) == BST_CHECKED;
+			saveConfig(instance.getConfig());
+			DestroyWindow(hwndDlg);
+			return true;
 			break;
 		}
 		break;
@@ -52,8 +49,9 @@ ManagerDialog::ManagerDialog()
 	snprintf(title, sizeof(title), "Manager");
 	SetWindowText(this->hwnd, title);
 
-	SetDlgItemText(hwnd, TRACE_C_ENABLED, "Enable");
+	SetDlgItemText(hwnd, TRACE_C_ENABLED, "Searcn utf16 on all registers");
 	SetDlgItemText(hwnd, TRACE_L_UTF16, "Utf-16 text");
+	SetDlgItemText(hwnd, TRACE_C_LOG, "Logging(Will affect performance)");
 
 	ShowWindow(this->hwnd, SW_SHOW);
 }

@@ -7,6 +7,7 @@ struct Config
 {
 	bool utf16Enabled = false;
 	std::wstring utf16Text = std::wstring(256, L'\0');
+	bool loggingEnabled = false;
 };
 
 void saveConfig(Config config);

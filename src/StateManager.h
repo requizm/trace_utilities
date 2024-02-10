@@ -2,14 +2,14 @@
 
 #include <Windows.h>
 #include <string>
+#include "Config.h"
 
 class StateManager
 {
 private:
 	HINSTANCE instance;
 
-	std::wstring utf16Text = std::wstring(256, L'\0');
-	bool utf16Enabled = false;
+	Config config;
 
 	std::wstring apiFile = std::wstring(256, L'\0');
 public:
@@ -17,11 +17,8 @@ public:
 	void setHInstance(HINSTANCE hInstance);
 	HINSTANCE getHInstance();
 
-	void setUtf16Text(std::wstring utf16Text);
-	std::wstring getUtf16Text();
-
-	void setUtf16Enabled(bool utf16Enabled);
-	bool getUtf16Enabled();
+	Config& getConfig();
+	void setConfig(Config config);
 
 	void setApiFile(std::wstring apiFile);
 	std::wstring getApiFile();

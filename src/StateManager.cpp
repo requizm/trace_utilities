@@ -16,24 +16,14 @@ HINSTANCE StateManager::getHInstance()
 	return instance;
 }
 
-void StateManager::setUtf16Text(std::wstring utf16Text)
+Config& StateManager::getConfig()
 {
-	this->utf16Text = utf16Text;
+	return config;
 }
 
-std::wstring StateManager::getUtf16Text()
+void StateManager::setConfig(Config config)
 {
-	return utf16Text;
-}
-
-void StateManager::setUtf16Enabled(bool utf16Enabled)
-{
-	this->utf16Enabled = utf16Enabled;
-}
-
-bool StateManager::getUtf16Enabled()
-{
-	return utf16Enabled;
+	this->config = config;
 }
 
 void StateManager::setApiFile(std::wstring apiFile)

@@ -50,7 +50,6 @@ void DisplayError(LPTSTR lpszFunction)
 void saveConfig(Config config)
 {
 	std::wstring apiFile = StateManager::getInstance().getApiFile();
-	_plugin_logprintf("create: apiFile: %ls\n", apiFile.c_str());
 	auto hFile = CreateFileW(apiFile.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE)
 	{
@@ -61,13 +60,20 @@ void saveConfig(Config config)
 	auto utf16Enabled = config.utf16Enabled ? 1 : 0;
 	if (!WritePrivateProfileStringW(L"Config", L"utf16Enabled", std::to_wstring(utf16Enabled).c_str(), apiFile.c_str()))
 	{
-		DisplayError(TEXT("WritePrivateProfileString"));
+		DisplayError(TEXT("WritePrivateProfileString(utf16Enabled"));
 		CloseHandle(hFile);
 		return;
 	}
 	if (!WritePrivateProfileStringW(L"Config", L"utf16Text", config.utf16Text.c_str(), apiFile.c_str()))
 	{
-		DisplayError(TEXT("WritePrivateProfileString"));
+		DisplayError(TEXT("WritePrivateProfileStringutf16Text(utf16Text)"));
+		CloseHandle(hFile);
+		return;
+	}
+	auto loggingEnabled = config.loggingEnabled ? 1 : 0;
+	if (!WritePrivateProfileStringW(L"Config", L"loggingEnabled", std::to_wstring(loggingEnabled).c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString(loggingEnabled)"));
 		CloseHandle(hFile);
 		return;
 	}
@@ -78,7 +84,6 @@ void saveConfig(Config config)
 Config loadConfig()
 {
 	std::wstring apiFile = StateManager::getInstance().getApiFile();
-	_plugin_logprintf("load: apiFile: %ls\n", apiFile.c_str());
 	auto hFile = CreateFileW(apiFile.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE)
 	{
@@ -122,11 +127,14 @@ Config loadConfig()
 	auto config = Config();
 	auto utf16Enabled = GetPrivateProfileIntW(L"Config", L"utf16Enabled", 0, apiFile.c_str());
 	config.utf16Enabled = utf16Enabled == 1;
+	auto loggingEnabled = GetPrivateProfileIntW(L"Config", L"loggingEnabled", 0, apiFile.c_str());
+	config.loggingEnabled = loggingEnabled == 1;
 	GetPrivateProfileStringW(L"Config", L"utf16Text", L"", &config.utf16Text[0], 256, apiFile.c_str());
-	StateManager::getInstance().setUtf16Enabled(config.utf16Enabled);
-	StateManager::getInstance().setUtf16Text(config.utf16Text);
+	StateManager::getInstance().setConfig(config);
 
 	UnmapViewOfFile(lpFileBase);
 	CloseHandle(hFileMapping);
 	CloseHandle(hFile);
+
+	return config;
 }
