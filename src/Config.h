@@ -6,7 +6,7 @@
 struct Config
 {
 	bool utf16Enabled = false;
-	char utf16Text[256] = "";
+	std::wstring utf16Text = std::wstring(256, L'\0');
 };
 
 void saveConfig(Config config);

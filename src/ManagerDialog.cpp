@@ -16,7 +16,7 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_INITDIALOG:
 	{
-		SetDlgItemText(hwndDlg, TRACE_T_UTF16, StateManager::getInstance().getUtf16Text());
+		SetDlgItemTextW(hwndDlg, TRACE_T_UTF16, StateManager::getInstance().getUtf16Text().c_str());
 		CheckDlgButton(hwndDlg, TRACE_C_ENABLED, StateManager::getInstance().getUtf16Enabled() ? BST_CHECKED : BST_UNCHECKED);
 		return true;
 	}
@@ -24,13 +24,13 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		switch (LOWORD(wParam))
 		{
 		case TRACE_B_OK:
-			LPSTR utf16Text = new char[256];
-			if (GetDlgItemText(hwndDlg, TRACE_T_UTF16, utf16Text, 100)) {
+			std::wstring utf16Text = std::wstring(256, L'\0');
+			if (GetDlgItemTextW(hwndDlg, TRACE_T_UTF16, &utf16Text[0], 256)) {
 				StateManager::getInstance().setUtf16Text(utf16Text);
 				StateManager::getInstance().setUtf16Enabled(IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED);
 				Config config;
 				config.utf16Enabled = StateManager::getInstance().getUtf16Enabled();
-				strcpy(config.utf16Text, utf16Text);
+				config.utf16Text = StateManager::getInstance().getUtf16Text();
 				saveConfig(config);
 				DestroyWindow(hwndDlg);
 				return true;

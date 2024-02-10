@@ -59,8 +59,18 @@ void saveConfig(Config config)
 	}
 
 	auto utf16Enabled = config.utf16Enabled ? 1 : 0;
-	WritePrivateProfileStringW(L"Config", L"utf16Enabled", std::to_wstring(utf16Enabled).c_str(), (LPCWSTR)hFile);
-	WritePrivateProfileStringW(L"Config", L"utf16Text", (LPWSTR)config.utf16Text, (LPCWSTR)hFile);
+	if (!WritePrivateProfileStringW(L"Config", L"utf16Enabled", std::to_wstring(utf16Enabled).c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString"));
+		CloseHandle(hFile);
+		return;
+	}
+	if (!WritePrivateProfileStringW(L"Config", L"utf16Text", config.utf16Text.c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString"));
+		CloseHandle(hFile);
+		return;
+	}
 
 	CloseHandle(hFile);
 }
@@ -84,6 +94,14 @@ Config loadConfig()
 		return Config();
 	}
 
+	if (dwFileSize == 0)
+	{
+		CloseHandle(hFile);
+		Config config;
+		saveConfig(config);
+		return config;
+	}
+
 	auto hFileMapping = CreateFileMappingW(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (hFileMapping == NULL)
 	{
@@ -101,11 +119,12 @@ Config loadConfig()
 		return Config();
 	}
 
-	auto lpFile = (char*)lpFileBase;
 	auto config = Config();
-	auto utf16Enabled = GetPrivateProfileIntW(L"Config", L"utf16Enabled", 0, (LPCWSTR)lpFile);
+	auto utf16Enabled = GetPrivateProfileIntW(L"Config", L"utf16Enabled", 0, apiFile.c_str());
 	config.utf16Enabled = utf16Enabled == 1;
-	GetPrivateProfileStringW(L"Config", L"utf16Text", L"", (LPWSTR)config.utf16Text, 256, (LPCWSTR)lpFile);
+	GetPrivateProfileStringW(L"Config", L"utf16Text", L"", &config.utf16Text[0], 256, apiFile.c_str());
+	StateManager::getInstance().setUtf16Enabled(config.utf16Enabled);
+	StateManager::getInstance().setUtf16Text(config.utf16Text);
 
 	UnmapViewOfFile(lpFileBase);
 	CloseHandle(hFileMapping);

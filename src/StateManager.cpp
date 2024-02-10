@@ -16,12 +16,12 @@ HINSTANCE StateManager::getHInstance()
 	return instance;
 }
 
-void StateManager::setUtf16Text(LPSTR utf16Text)
+void StateManager::setUtf16Text(std::wstring utf16Text)
 {
 	this->utf16Text = utf16Text;
 }
 
-LPSTR StateManager::getUtf16Text()
+std::wstring StateManager::getUtf16Text()
 {
 	return utf16Text;
 }

@@ -5,7 +5,7 @@
 #include "Config.h"
 #include <filesystem>
 
-bool utf16Search(ULONG_PTR addr, wchar_t* str, int strLen)
+bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
 {
 	// dprintf("utf16Search(%p, %p, %d)\n", addr, str, strLen);
 	if (!DbgMemIsValidReadPtr(addr))
@@ -25,7 +25,7 @@ bool utf16Search(ULONG_PTR addr, wchar_t* str, int strLen)
 	// dprintf("input = %ls\n", nullTerminatedP);
 	// dprintf("str = %ls\n", str);
 
-	bool result = wcscmp(nullTerminatedP, str) == 0;
+	bool result = wcscmp(nullTerminatedP, str.data()) == 0;
 	if (!result)
 	{
 		// dprintf("Not equals.\n");
@@ -43,7 +43,7 @@ bool utf16Search(ULONG_PTR addr, wchar_t* str, int strLen)
 				memcpy(nullTerminatedPP, wcharP, strLen * sizeof(wchar_t));
 				nullTerminatedPP[strLen] = 0;
 
-				result = wcscmp(nullTerminatedPP, str) == 0;
+				result = wcscmp(nullTerminatedPP, str.data()) == 0;
 				// if (result)
 				// {
 				// 	dprintf("Found at %p\n", addrP);
@@ -152,17 +152,13 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct)
 		_plugin_logprintf("Failed to register special.search\n");
 	}
 
-	std::wstring apiFile = StateManager::getInstance().getApiFile();
-
+	std::wstring apiFile = std::wstring(MAX_PATH, L'\0');
 	GetModuleFileNameW(StateManager::getInstance().getHInstance(), &apiFile[0], apiFile.size());
 	std::filesystem::path filePath(apiFile);
 	filePath.remove_filename();
 	filePath /= std::wstring(DOWIDEN(PLUGIN_NAME)) + L".ini";
 	apiFile = filePath.wstring();
 	StateManager::getInstance().setApiFile(apiFile);
-	_plugin_logprintf("apiFile = %ls\n", apiFile.c_str());
-	_plugin_logprintf("apiFile = %ls\n", apiFile.c_str());
-	_plugin_logprintf("apiFile = %ls\n", apiFile.c_str());
 	loadConfig();
 
 	// Return false to cancel loading the plugin.
@@ -212,9 +208,8 @@ PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info)
 		return;
 	}
 
-	char* searchCharStr = stateManager.getUtf16Text();
-	wchar_t* searchStr = charToWChar(searchCharStr);
-	int len = wcslen(searchStr);
+	std::wstring searchStr = stateManager.getUtf16Text();
+	int len = searchStr.length();
 
 	REGDUMP regdump;
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
