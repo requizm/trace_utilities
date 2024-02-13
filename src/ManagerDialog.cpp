@@ -27,7 +27,9 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		{
 		case TRACE_B_OK:
 			StateManager& instance = StateManager::getInstance();
-			GetDlgItemTextW(hwndDlg, TRACE_T_UTF16, &instance.getConfig().utf16Text[0], 256);
+			wchar_t utf16Text[256];
+			GetDlgItemTextW(hwndDlg, TRACE_T_UTF16, utf16Text, 256);
+			instance.getConfig().utf16Text = std::wstring(utf16Text);
 			instance.getConfig().utf16Enabled = IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED;
 			instance.getConfig().loggingEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_LOG) == BST_CHECKED;
 			saveConfig(instance.getConfig());

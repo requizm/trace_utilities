@@ -35,6 +35,7 @@ bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
 
 	wchar_t* wchar = new wchar_t[strLen];
 	DbgMemRead(addr, wchar, strLen * sizeof(wchar_t));
+
 	wchar_t* nullTerminatedP = new wchar_t[strLen + 1];
 	memcpy(nullTerminatedP, wchar, strLen * sizeof(wchar_t));
 	nullTerminatedP[strLen] = 0;
@@ -45,7 +46,10 @@ bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
 		_plugin_logprintf("utf16Search: addr: %p, str: %ls, nullTerminatedP: %ls\n", addr, str.c_str(), nullTerminatedP);
 	}
 
-	bool result = wcscmp(nullTerminatedP, str.data()) == 0;
+	bool result = wcscmp(nullTerminatedP, str.c_str()) == 0;
+	delete[] nullTerminatedP;
+	delete[] wchar;
+
 	if (!result)
 	{
 		// Maybe addr is a pointer to a string. Use DbgMemIsValidReadPtr and DbgMemRead again
@@ -66,16 +70,12 @@ bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
 					_plugin_logprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, str.c_str(), nullTerminatedPP);
 				}
 
-				result = wcscmp(nullTerminatedPP, str.data()) == 0;
-
+				result = wcscmp(nullTerminatedPP, str.c_str()) == 0;
 				delete[] nullTerminatedPP;
 				delete[] wcharP;
 			}
 		}
 	}
-
-	delete[] nullTerminatedP;
-	delete[] wchar;
 
 	return result;
 }

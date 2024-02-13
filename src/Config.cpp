@@ -129,7 +129,10 @@ Config loadConfig()
 	config.utf16Enabled = utf16Enabled == 1;
 	auto loggingEnabled = GetPrivateProfileIntW(L"Config", L"loggingEnabled", 0, apiFile.c_str());
 	config.loggingEnabled = loggingEnabled == 1;
-	GetPrivateProfileStringW(L"Config", L"utf16Text", L"", &config.utf16Text[0], 256, apiFile.c_str());
+
+	wchar_t utf16Text[256];
+	GetPrivateProfileStringW(L"Config", L"utf16Text", L"", utf16Text, 256, apiFile.c_str());
+	config.utf16Text = std::wstring(utf16Text);
 	StateManager::getInstance().setConfig(config);
 
 	UnmapViewOfFile(lpFileBase);
