@@ -44,6 +44,7 @@ std::string removeReferenceQuotes(std::string str)
 	return result;
 }
 
+// Why not DbgGetStringAt? Because I tried to it crashes in somewhere and I don't know why!
 bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, int strLen)
 {
 	if (!DbgMemIsValidReadPtr(addr))
@@ -51,19 +52,53 @@ bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, int strLen)
 		return false;
 	}
 
-	std::string userInputStr = std::string(userInputWStr.begin(), userInputWStr.end()); // FIXME: This is not a good solution. It removes non-ascii characters.
-	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
+	wchar_t* wchar = new wchar_t[strLen];
+	DbgMemRead(addr, wchar, strLen * sizeof(wchar_t));
 
-	char* buffer = new char[512];
-	bool strExists = DbgGetStringAt(addr, buffer);
-	if (strExists)
+	wchar_t* nullTerminatedP = new wchar_t[strLen + 1];
+	memcpy(nullTerminatedP, wchar, strLen * sizeof(wchar_t));
+	nullTerminatedP[strLen] = 0;
+
+	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
+	if (logginEnabled)
 	{
-		std::string strBuffer = std::string(buffer);
-		if (logginEnabled) {
-			dprintf("utf16Search first iteration: addr: %p, str: %s, strBuffer: %s\n", addr, userInputStr.c_str(), strBuffer.c_str());
+		dprintf("utf16Search: addr: %p, str: %ls, nullTerminatedP: %ls\n", addr, userInputWStr.c_str(), nullTerminatedP);
+	}
+
+	bool result = wcscmp(nullTerminatedP, userInputWStr.c_str()) == 0;
+	delete[] nullTerminatedP;
+	delete[] wchar;
+	if (result)
+	{
+		return true;
+	}
+
+	// Maybe addr is a pointer to a string. Use DbgMemIsValidReadPtr and DbgMemRead again
+	ULONG_PTR addrP;
+	if (DbgMemRead(addr, &addrP, sizeof(ULONG_PTR)))
+	{
+		if (DbgMemIsValidReadPtr((duint)addrP))
+		{
+			wchar_t* wcharP = new wchar_t[strLen];
+			DbgMemRead((duint)addrP, wcharP, strLen * sizeof(wchar_t));
+
+			wchar_t* nullTerminatedPP = new wchar_t[strLen + 1];
+			memcpy(nullTerminatedPP, wcharP, strLen * sizeof(wchar_t));
+			nullTerminatedPP[strLen] = 0;
+
+			if (logginEnabled)
+			{
+				dprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, userInputWStr.c_str(), nullTerminatedPP);
+			}
+
+			result = wcscmp(nullTerminatedPP, userInputWStr.c_str()) == 0;
+			delete[] nullTerminatedPP;
+			delete[] wcharP;
+			if (result)
+			{
+				return true;
+			}
 		}
-		std::string strBufferWithoutQuotes = removeReferenceQuotes(strBuffer);
-		return strBufferWithoutQuotes.find(userInputStr) != std::string::npos;
 	}
 
 	return false;
