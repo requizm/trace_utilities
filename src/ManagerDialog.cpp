@@ -17,9 +17,19 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_INITDIALOG:
 	{
 		StateManager& instance = StateManager::getInstance();
-		SetDlgItemTextW(hwndDlg, TRACE_T_UTF16, instance.getConfig().utf16Text.c_str());
-		CheckDlgButton(hwndDlg, TRACE_C_ENABLED, instance.getConfig().utf16Enabled ? BST_CHECKED : BST_UNCHECKED);
 		CheckDlgButton(hwndDlg, TRACE_C_LOG, instance.getConfig().loggingEnabled ? BST_CHECKED : BST_UNCHECKED);
+
+		SetDlgItemTextW(hwndDlg, TRACE_T_SEARCH, instance.getConfig().utf16SearchText.c_str());
+		CheckDlgButton(hwndDlg, TRACE_C_ENABLED, instance.getConfig().utf16SearchEnabled ? BST_CHECKED : BST_UNCHECKED);
+		CheckDlgButton(hwndDlg, TRACE_C_REGISTERS, instance.getConfig().utf16SearchRegistersEnabled ? BST_CHECKED : BST_UNCHECKED);
+
+		CheckDlgButton(hwndDlg, TRACE_C_MEMORY, instance.getConfig().utf16MemoryEnabled ? BST_CHECKED : BST_UNCHECKED);
+		wchar_t utf16MemoryAddress[256];
+		wchar_t utf16MemorySize[256];
+		swprintf_s(utf16MemoryAddress, L"%p", instance.getConfig().utf16MemoryAddress);
+		swprintf_s(utf16MemorySize, L"%p", instance.getConfig().utf16MemorySize);
+		SetDlgItemTextW(hwndDlg, TRACE_T_MEMORYADDRESS, utf16MemoryAddress);
+		SetDlgItemTextW(hwndDlg, TRACE_T_MEMORYSIZE, utf16MemorySize);
 		return true;
 	}
 	case WM_COMMAND:
@@ -27,11 +37,20 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		{
 		case TRACE_B_OK:
 			StateManager& instance = StateManager::getInstance();
-			wchar_t utf16Text[256];
-			GetDlgItemTextW(hwndDlg, TRACE_T_UTF16, utf16Text, 256);
-			instance.getConfig().utf16Text = std::wstring(utf16Text);
-			instance.getConfig().utf16Enabled = IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED;
 			instance.getConfig().loggingEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_LOG) == BST_CHECKED;
+			wchar_t utf16Text[256];
+			GetDlgItemTextW(hwndDlg, TRACE_T_SEARCH, utf16Text, 256);
+			instance.getConfig().utf16SearchText = std::wstring(utf16Text);
+			instance.getConfig().utf16SearchEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED;
+			instance.getConfig().utf16SearchRegistersEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_REGISTERS) == BST_CHECKED;
+
+			instance.getConfig().utf16MemoryEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_MEMORY) == BST_CHECKED;
+			wchar_t utf16MemoryAddress[256];
+			wchar_t utf16MemorySize[256];
+			GetDlgItemTextW(hwndDlg, TRACE_T_MEMORYADDRESS, utf16MemoryAddress, 256);
+			GetDlgItemTextW(hwndDlg, TRACE_T_MEMORYSIZE, utf16MemorySize, 256);
+			instance.getConfig().utf16MemoryAddress = wcstoul(utf16MemoryAddress, NULL, 16);
+			instance.getConfig().utf16MemorySize = wcstoul(utf16MemorySize, NULL, 16);
 			saveConfig(instance.getConfig());
 			DestroyWindow(hwndDlg);
 			return true;
@@ -47,13 +66,5 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 ManagerDialog::ManagerDialog()
 {
 	this->hwnd = CreateDialog(StateManager::getInstance().getHInstance(), MAKEINTRESOURCE(IDD_DIALOG1), GuiGetWindowHandle(), DialogProc);
-	char title[100];
-	snprintf(title, sizeof(title), "Manager");
-	SetWindowText(this->hwnd, title);
-
-	SetDlgItemText(hwnd, TRACE_C_ENABLED, "Searcn utf16 on all registers");
-	SetDlgItemText(hwnd, TRACE_L_UTF16, "Utf-16 text");
-	SetDlgItemText(hwnd, TRACE_C_LOG, "Logging(Will affect performance)");
-
 	ShowWindow(this->hwnd, SW_SHOW);
 }

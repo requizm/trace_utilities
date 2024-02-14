@@ -44,13 +44,109 @@ std::string removeReferenceQuotes(std::string str)
 	return result;
 }
 
+BOOL changeMemoryPageProtection(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, PDWORD lpflOldProtect) {
+    return VirtualProtectEx(hProcess, lpAddress, dwSize, PAGE_EXECUTE_READWRITE, lpflOldProtect);
+}
+
+bool readProcessMemoryWideString(HANDLE hProcess, LPCVOID lpBaseAddress, LPVOID lpBuffer, SIZE_T nSize, SIZE_T* lpNumberOfBytesRead) {
+    MEMORY_BASIC_INFORMATION mbi;
+    SIZE_T bytesRead =   0;
+    SIZE_T totalBytesRead =   0;
+
+    while (totalBytesRead < nSize) {
+        if (!VirtualQueryEx(hProcess, (LPVOID)(totalBytesRead + (SIZE_T)lpBaseAddress), &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
+            // Handle error querying memory information
+            DisplayError(TEXT("VirtualQueryEx"));
+            break;
+        }
+
+        DWORD oldProtect;
+        if (!changeMemoryPageProtection(hProcess, mbi.BaseAddress, mbi.RegionSize, &oldProtect)) {
+            // Handle error changing memory protection
+            DisplayError(TEXT("changeMemoryPageProtection"));
+            break;
+        }
+
+        SIZE_T bytesToRead = min(nSize - totalBytesRead, mbi.RegionSize);
+        if (!ReadProcessMemory(hProcess, (LPVOID)(totalBytesRead + (SIZE_T)lpBaseAddress), (LPVOID)((SIZE_T)lpBuffer + totalBytesRead), bytesToRead, &bytesRead)) {
+            // Handle error reading the memory
+            DisplayError(TEXT("ReadProcessMemory"));
+            break;
+        }
+
+        totalBytesRead += bytesRead;
+
+        // Restore the original memory protection
+        if (!VirtualProtectEx(hProcess, mbi.BaseAddress, mbi.RegionSize, oldProtect, &oldProtect)) {
+            // Handle error restoring memory protection
+            DisplayError(TEXT("VirtualProtectEx"));
+            break;
+        }
+    }
+
+    *lpNumberOfBytesRead = totalBytesRead;
+    return totalBytesRead >   0;
+}
+
+
+bool searchMemoryForString(std::wstring& searchString) {
+	// TODO: Do not open the process each time, open when trace_into or trace_over is called
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DbgGetProcessId());
+    if (!hProcess) {
+        // Failed to open the process
+		DisplayError(TEXT("OpenProcess"));
+        return false;
+    }
+
+	StateManager& stateManager = StateManager::getInstance();
+	bool logginEnabled = stateManager.getConfig().loggingEnabled;
+
+
+	LPCVOID startAddress = (LPCVOID)stateManager.getConfig().utf16MemoryAddress;
+	SIZE_T size = stateManager.getConfig().utf16MemorySize;
+
+	if (logginEnabled)
+	{
+		dprintf("searchMemoryForString: addr: %p, size: %p\n", startAddress, size);
+	}
+
+    // Convert the search string to a vector of wchar_t for comparison
+    std::vector<wchar_t> searchVector(searchString.begin(), searchString.end());
+
+
+    // Buffer to hold the memory contents
+    std::vector<wchar_t> buffer(size / sizeof(wchar_t));
+
+    // Read the memory from the process
+    SIZE_T bytesRead;
+    if (!readProcessMemoryWideString(hProcess, startAddress, buffer.data(), size, &bytesRead)) {
+        CloseHandle(hProcess);
+        return false;
+    }
+
+    // Use std::search to find the sequence in the memory range
+    auto found = std::search(buffer.begin(), buffer.end(), searchVector.begin(), searchVector.end());
+
+    // Close the process handle
+    CloseHandle(hProcess);
+
+    // Check if the sequence was found
+    bool foundBool = found != buffer.end();
+	if (foundBool) {
+		dprintf("Found the string on the address: %p\n", stateManager.getConfig().utf16MemoryAddress + (found - buffer.begin()));
+	}
+
+	return foundBool;
+}
+
 // Why not DbgGetStringAt? Because I tried to it crashes in somewhere and I don't know why!
-bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, int strLen)
+bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, bool pointer = true)
 {
 	if (!DbgMemIsValidReadPtr(addr))
 	{
 		return false;
 	}
+	int strLen = userInputWStr.length();
 
 	wchar_t* wchar = new wchar_t[strLen];
 	DbgMemRead(addr, wchar, strLen * sizeof(wchar_t));
@@ -74,29 +170,32 @@ bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, int strLen)
 	}
 
 	// Maybe addr is a pointer to a string. Use DbgMemIsValidReadPtr and DbgMemRead again
-	ULONG_PTR addrP;
-	if (DbgMemRead(addr, &addrP, sizeof(ULONG_PTR)))
+	if (pointer)
 	{
-		if (DbgMemIsValidReadPtr((duint)addrP))
+		ULONG_PTR addrP;
+		if (DbgMemRead(addr, &addrP, sizeof(ULONG_PTR)))
 		{
-			wchar_t* wcharP = new wchar_t[strLen];
-			DbgMemRead((duint)addrP, wcharP, strLen * sizeof(wchar_t));
-
-			wchar_t* nullTerminatedPP = new wchar_t[strLen + 1];
-			memcpy(nullTerminatedPP, wcharP, strLen * sizeof(wchar_t));
-			nullTerminatedPP[strLen] = 0;
-
-			if (logginEnabled)
+			if (DbgMemIsValidReadPtr((duint)addrP))
 			{
-				dprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, userInputWStr.c_str(), nullTerminatedPP);
-			}
+				wchar_t* wcharP = new wchar_t[strLen];
+				DbgMemRead((duint)addrP, wcharP, strLen * sizeof(wchar_t));
 
-			result = wcscmp(nullTerminatedPP, userInputWStr.c_str()) == 0;
-			delete[] nullTerminatedPP;
-			delete[] wcharP;
-			if (result)
-			{
-				return true;
+				wchar_t* nullTerminatedPP = new wchar_t[strLen + 1];
+				memcpy(nullTerminatedPP, wcharP, strLen * sizeof(wchar_t));
+				nullTerminatedPP[strLen] = 0;
+
+				if (logginEnabled)
+				{
+					dprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, userInputWStr.c_str(), nullTerminatedPP);
+				}
+
+				result = wcscmp(nullTerminatedPP, userInputWStr.c_str()) == 0;
+				delete[] nullTerminatedPP;
+				delete[] wcharP;
+				if (result)
+				{
+					return true;
+				}
 			}
 		}
 	}
@@ -104,7 +203,7 @@ bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, int strLen)
 	return false;
 }
 
-bool utf16SearchOnRegisters(std::wstring searchStr, int len)
+bool utf16SearchOnRegisters(std::wstring searchStr)
 {
 	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
 
@@ -112,33 +211,8 @@ bool utf16SearchOnRegisters(std::wstring searchStr, int len)
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
 
 	auto& r = regdump.regcontext;
-#ifdef _WIN64
 	// Check each register
-	if (utf16Search(r.cax, searchStr, len) || utf16Search(r.cbx, searchStr, len) || utf16Search(r.ccx, searchStr, len) || utf16Search(r.cdx, searchStr, len) || utf16Search(r.csi, searchStr, len) || utf16Search(r.cdi, searchStr, len) || utf16Search(r.cip, searchStr, len) || utf16Search(r.csp, searchStr, len) || utf16Search(r.cbp, searchStr, len))
-	{
-		if (logginEnabled)
-		{
-			dprintf("utf16SearchOnRegisters: Found on register\n");
-		}
-		return true;
-	}
-
-	// Check from 'csp + 0' to 'csp + 0x30' by increasing 0x4
-	duint esp = r.csp;
-	for (duint i = 0; i < 0x30; i += 0x4)
-	{
-		if (utf16Search(esp + i, searchStr, len))
-		{
-			if (logginEnabled)
-			{
-				dprintf("utf16SearchOnRegisters: Found on esp stack\n");
-			}
-			return true;
-		}
-	}
-#else
-	// Check each register
-	if (utf16Search(r.cax, searchStr, len) || utf16Search(r.cbx, searchStr, len) || utf16Search(r.ccx, searchStr, len) || utf16Search(r.cdx, searchStr, len) || utf16Search(r.csi, searchStr, len) || utf16Search(r.cdi, searchStr, len) || utf16Search(r.cip, searchStr, len) || utf16Search(r.csp, searchStr, len) || utf16Search(r.cbp, searchStr, len))
+	if (utf16Search(r.cax, searchStr) || utf16Search(r.cbx, searchStr) || utf16Search(r.ccx, searchStr) || utf16Search(r.cdx, searchStr) || utf16Search(r.csi, searchStr) || utf16Search(r.cdi, searchStr) || utf16Search(r.cip, searchStr) || utf16Search(r.csp, searchStr) || utf16Search(r.cbp, searchStr))
 	{
 		if (logginEnabled)
 		{
@@ -148,9 +222,10 @@ bool utf16SearchOnRegisters(std::wstring searchStr, int len)
 	}
 
 	duint esp = r.csp;
+	duint ebp = r.cbp;
 	for (duint i = 0; i < 0x30; i += 0x4)
 	{
-		if (utf16Search(esp + i, searchStr, len))
+		if (utf16Search(esp + i, searchStr))
 		{
 			if (logginEnabled)
 			{
@@ -158,9 +233,15 @@ bool utf16SearchOnRegisters(std::wstring searchStr, int len)
 			}
 			return true;
 		}
+		if (utf16Search(ebp + i, searchStr))
+		{
+			if (logginEnabled)
+			{
+				dprintf("utf16SearchOnRegisters: Found on ebp stack\n");
+			}
+			return true;
+		}
 	}
-
-#endif //_WIN64
 
 	return false;
 }
@@ -176,7 +257,7 @@ static bool utf16SearchCommand(int argc, char** argv)
 	std::wstring searchStr = stringToWstring(argv[1]);
 	int len = searchStr.length();
 
-	return utf16SearchOnRegisters(searchStr, len);
+	return utf16SearchOnRegisters(searchStr);
 }
 
 #define EXPAND(x) L##x
@@ -227,17 +308,31 @@ PLUG_EXPORT CDECL void CBMENUENTRY(CBTYPE cbType, void* callbackInfo)
 PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info)
 {
 	StateManager& stateManager = StateManager::getInstance();
-	if (!stateManager.getConfig().utf16Enabled)
+	if (!stateManager.getConfig().utf16SearchEnabled)
 	{
 		return;
 	}
 
-	std::wstring searchStr = stateManager.getConfig().utf16Text;
-	int len = searchStr.length();
+	std::wstring searchStr = stateManager.getConfig().utf16SearchText;
 
-	if (utf16SearchOnRegisters(searchStr, len))
+	if (stateManager.getConfig().utf16SearchRegistersEnabled)
 	{
-		info->stop = true;
+		bool foundInRegisters = utf16SearchOnRegisters(searchStr);
+		if (foundInRegisters)
+		{
+			info->stop = true;
+			return;
+		}
+	}
+
+	if (stateManager.getConfig().utf16MemoryEnabled)
+	{
+		bool foundInMemory = searchMemoryForString(searchStr);
+		if (foundInMemory)
+		{
+			info->stop = true;
+			return;
+		}
 	}
 }
 

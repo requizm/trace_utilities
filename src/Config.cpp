@@ -2,50 +2,7 @@
 #include <windows.h>
 #include <string>
 #include "plugin.h"
-#include <strsafe.h>
 #include "StateManager.h"
-
-void DisplayError(LPTSTR lpszFunction)
-// Routine Description:
-// Retrieve and output the system error message for the last-error code
-{
-	LPVOID lpMsgBuf;
-	LPVOID lpDisplayBuf;
-	DWORD dw = GetLastError();
-
-	FormatMessage(
-		FORMAT_MESSAGE_ALLOCATE_BUFFER |
-		FORMAT_MESSAGE_FROM_SYSTEM |
-		FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,
-		dw,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		(LPTSTR)&lpMsgBuf,
-		0,
-		NULL);
-
-	lpDisplayBuf =
-		(LPVOID)LocalAlloc(LMEM_ZEROINIT,
-			(lstrlen((LPCTSTR)lpMsgBuf)
-				+ lstrlen((LPCTSTR)lpszFunction)
-				+ 40) // account for format string
-			* sizeof(TCHAR));
-
-	if (FAILED(StringCchPrintf((LPTSTR)lpDisplayBuf,
-		LocalSize(lpDisplayBuf) / sizeof(TCHAR),
-		TEXT("%s failed with error code %d as follows:\n%s"),
-		lpszFunction,
-		dw,
-		lpMsgBuf)))
-	{
-		dprintf("FATAL ERROR: Unable to output error code.\n");
-	}
-
-	dprintf(TEXT("ERROR: %s\n"), (LPCTSTR)lpDisplayBuf);
-
-	LocalFree(lpMsgBuf);
-	LocalFree(lpDisplayBuf);
-}
 
 void saveConfig(Config config)
 {
@@ -57,26 +14,61 @@ void saveConfig(Config config)
 		return;
 	}
 
-	auto utf16Enabled = config.utf16Enabled ? 1 : 0;
-	if (!WritePrivateProfileStringW(L"Config", L"utf16Enabled", std::to_wstring(utf16Enabled).c_str(), apiFile.c_str()))
-	{
-		DisplayError(TEXT("WritePrivateProfileString(utf16Enabled"));
-		CloseHandle(hFile);
-		return;
-	}
-	if (!WritePrivateProfileStringW(L"Config", L"utf16Text", config.utf16Text.c_str(), apiFile.c_str()))
-	{
-		DisplayError(TEXT("WritePrivateProfileStringutf16Text(utf16Text)"));
-		CloseHandle(hFile);
-		return;
-	}
-	auto loggingEnabled = config.loggingEnabled ? 1 : 0;
+	bool loggingEnabled = config.loggingEnabled ? 1 : 0;
 	if (!WritePrivateProfileStringW(L"Config", L"loggingEnabled", std::to_wstring(loggingEnabled).c_str(), apiFile.c_str()))
 	{
 		DisplayError(TEXT("WritePrivateProfileString(loggingEnabled)"));
 		CloseHandle(hFile);
 		return;
 	}
+
+	bool utf16SearchEnabled = config.utf16SearchEnabled ? 1 : 0;
+	if (!WritePrivateProfileStringW(L"Config", L"utf16SearchEnabled", std::to_wstring(utf16SearchEnabled).c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString(utf16SearchEnabled"));
+		CloseHandle(hFile);
+		return;
+	}
+
+	if (!WritePrivateProfileStringW(L"Config", L"utf16SearchText", config.utf16SearchText.c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileStringutf16Text(utf16SearchText)"));
+		CloseHandle(hFile);
+		return;
+	}
+
+	bool utf16SearchRegistersEnabled = config.utf16SearchRegistersEnabled ? 1 : 0;
+	if (!WritePrivateProfileStringW(L"Config", L"utf16SearchRegistersEnabled", std::to_wstring(utf16SearchRegistersEnabled).c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString(utf16SearchRegistersEnabled)"));
+		CloseHandle(hFile);
+		return;
+	}
+
+	bool utf16MemoryEnabled = config.utf16MemoryEnabled ? 1 : 0;
+	if (!WritePrivateProfileStringW(L"Config", L"utf16MemoryEnabled", std::to_wstring(utf16MemoryEnabled).c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString(utf16MemoryEnabled)"));
+		CloseHandle(hFile);
+		return;
+	}
+
+	if (!WritePrivateProfileStringW(L"Config", L"utf16MemoryAddress", std::to_wstring(config.utf16MemoryAddress).c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString(utf16MemoryAddress)"));
+		CloseHandle(hFile);
+		return;
+	}
+
+	if (!WritePrivateProfileStringW(L"Config", L"utf16MemorySize", std::to_wstring(config.utf16MemorySize).c_str(), apiFile.c_str()))
+	{
+		DisplayError(TEXT("WritePrivateProfileString(utf16MemorySize)"));
+		CloseHandle(hFile);
+		return;
+	}
+
+	dprintf("Saved config: loggingEnabled: %d, utf16SearchEnabled: %d, utf16SearchText: %ls, utf16SearchRegistersEnabled: %d, utf16MemoryEnabled: %d, utf16MemoryAddress: %p, utf16MemorySize: %p\n",
+		config.loggingEnabled, config.utf16SearchEnabled, config.utf16SearchText.c_str(), config.utf16SearchRegistersEnabled, config.utf16MemoryEnabled, config.utf16MemoryAddress, config.utf16MemorySize);
 
 	CloseHandle(hFile);
 }
@@ -125,14 +117,21 @@ Config loadConfig()
 	}
 
 	auto config = Config();
-	auto utf16Enabled = GetPrivateProfileIntW(L"Config", L"utf16Enabled", 0, apiFile.c_str());
-	config.utf16Enabled = utf16Enabled == 1;
-	auto loggingEnabled = GetPrivateProfileIntW(L"Config", L"loggingEnabled", 0, apiFile.c_str());
-	config.loggingEnabled = loggingEnabled == 1;
+	config.loggingEnabled = GetPrivateProfileIntW(L"Config", L"loggingEnabled", 0, apiFile.c_str()) == 1;
+	config.utf16SearchEnabled = GetPrivateProfileIntW(L"Config", L"utf16SearchEnabled", 0, apiFile.c_str()) == 1;
 
-	wchar_t utf16Text[256];
-	GetPrivateProfileStringW(L"Config", L"utf16Text", L"", utf16Text, 256, apiFile.c_str());
-	config.utf16Text = std::wstring(utf16Text);
+	wchar_t utf16SearchText[256];
+	GetPrivateProfileStringW(L"Config", L"utf16SearchText", L"", utf16SearchText, 256, apiFile.c_str());
+	config.utf16SearchText = std::wstring(utf16SearchText);
+
+	config.utf16SearchRegistersEnabled = GetPrivateProfileIntW(L"Config", L"utf16SearchRegistersEnabled", 0, apiFile.c_str()) == 1;
+	config.utf16MemoryEnabled = GetPrivateProfileIntW(L"Config", L"utf16MemoryEnabled", 0, apiFile.c_str()) == 1;
+	config.utf16MemoryAddress = GetPrivateProfileIntW(L"Config", L"utf16MemoryAddress", 0, apiFile.c_str());
+	config.utf16MemorySize = GetPrivateProfileIntW(L"Config", L"utf16MemorySize", 0, apiFile.c_str());
+
+	dprintf("Loaded config: loggingEnabled=%d, utf16SearchEnabled=%d, utf16SearchText=%ws, utf16SearchRegistersEnabled=%d, utf16MemoryEnabled=%d, utf16MemoryAddress=%p, utf16MemorySize=%p\n",
+		config.loggingEnabled, config.utf16SearchEnabled, config.utf16SearchText.c_str(), config.utf16SearchRegistersEnabled, config.utf16MemoryEnabled, config.utf16MemoryAddress, config.utf16MemorySize);
+
 	StateManager::getInstance().setConfig(config);
 
 	UnmapViewOfFile(lpFileBase);
