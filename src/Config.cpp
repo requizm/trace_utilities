@@ -38,10 +38,10 @@ void DisplayError(LPTSTR lpszFunction)
 		dw,
 		lpMsgBuf)))
 	{
-		_plugin_logprintf("FATAL ERROR: Unable to output error code.\n");
+		dprintf("FATAL ERROR: Unable to output error code.\n");
 	}
 
-	_plugin_logprintf(TEXT("ERROR: %s\n"), (LPCTSTR)lpDisplayBuf);
+	dprintf(TEXT("ERROR: %s\n"), (LPCTSTR)lpDisplayBuf);
 
 	LocalFree(lpMsgBuf);
 	LocalFree(lpDisplayBuf);

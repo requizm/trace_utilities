@@ -3,7 +3,7 @@ version = "3.15"
 cmkr-include = "cmake/cmkr.cmake"
 
 [project]
-name = "PluginTemplate"
+name = "TraceUtilities"
 include-before = [
 	"cmake/msvc-static-runtime.cmake",
 	"cmake/msvc-configurations.cmake",
@@ -18,7 +18,7 @@ include-after = ["cmake/x64dbg.cmake"]
 type = "shared"
 add-function = "x64dbg_plugin"
 
-[target.PluginTemplate]
+[target.TraceUtilities]
 type = "plugin"
 sources = [
     "src/*.cpp",
@@ -26,6 +26,6 @@ sources = [
     "src/*.rc",
 ]
 
-[target.PluginTemplate.properties]
+[target.TraceUtilities.properties]
 CXX_STANDARD = "17"
 CXX_STANDARD_REQUIRED = true

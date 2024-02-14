@@ -27,7 +27,7 @@ endif()
 include("cmake/msvc-static-runtime.cmake")
 include("cmake/msvc-configurations.cmake")
 
-project(PluginTemplate)
+project(TraceUtilities)
 
 include(FetchContent)
 
@@ -46,8 +46,8 @@ FetchContent_MakeAvailable(x64dbg)
 
 include("cmake/x64dbg.cmake")
 
-# Target: PluginTemplate
-set(PluginTemplate_SOURCES
+# Target: TraceUtilities
+set(TraceUtilities_SOURCES
 	"src/Config.cpp"
 	"src/ManagerDialog.cpp"
 	"src/StateManager.cpp"
@@ -59,16 +59,16 @@ set(PluginTemplate_SOURCES
 	"src/plugin.h"
 	"src/pluginmain.h"
 	"src/resource.h"
-	"src/PluginTemplate.rc"
+	"src/TraceUtilities.rc"
 	cmake.toml
 )
 
-x64dbg_plugin(PluginTemplate)
+x64dbg_plugin(TraceUtilities)
 
-target_sources(PluginTemplate PRIVATE ${PluginTemplate_SOURCES})
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PluginTemplate_SOURCES})
+target_sources(TraceUtilities PRIVATE ${TraceUtilities_SOURCES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${TraceUtilities_SOURCES})
 
-set_target_properties(PluginTemplate PROPERTIES
+set_target_properties(TraceUtilities PROPERTIES
 	CXX_STANDARD
 		17
 	CXX_STANDARD_REQUIRED

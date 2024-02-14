@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by PluginTemplate.rc
+// Used by TraceUtilities.rc
 //
 #define IDD_DIALOG1                     105
 #define TRACE_B_IDOK                    1001

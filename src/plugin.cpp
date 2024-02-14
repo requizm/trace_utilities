@@ -28,7 +28,7 @@ bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
 	//std::wstring addressStr = std::wstring(strLen + 1, L'\0');
 	//if (!DbgMemRead(addr, &addressStr[0], strLen * sizeof(wchar_t)))
 	//{
-	//	_plugin_logprintf("DbgMemRead failed\n");
+	//	dprintf("DbgMemRead failed\n");
 	//	return false;
 	//}
 	//addressStr[strLen] = 0;
@@ -43,7 +43,7 @@ bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
 	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
 	if (logginEnabled)
 	{
-		_plugin_logprintf("utf16Search: addr: %p, str: %ls, nullTerminatedP: %ls\n", addr, str.c_str(), nullTerminatedP);
+		dprintf("utf16Search: addr: %p, str: %ls, nullTerminatedP: %ls\n", addr, str.c_str(), nullTerminatedP);
 	}
 
 	bool result = wcscmp(nullTerminatedP, str.c_str()) == 0;
@@ -67,7 +67,7 @@ bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
 
 				if (logginEnabled)
 				{
-					_plugin_logprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, str.c_str(), nullTerminatedPP);
+					dprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, str.c_str(), nullTerminatedPP);
 				}
 
 				result = wcscmp(nullTerminatedPP, str.c_str()) == 0;
@@ -94,7 +94,7 @@ bool utf16SearchOnRegisters(std::wstring searchStr, int len)
 	{
 		if (logginEnabled)
 		{
-			_plugin_logprintf("utf16SearchOnRegisters: Found on register\n");
+			dprintf("utf16SearchOnRegisters: Found on register\n");
 		}
 		return true;
 	}
@@ -107,7 +107,7 @@ bool utf16SearchOnRegisters(std::wstring searchStr, int len)
 		{
 			if (logginEnabled)
 			{
-				_plugin_logprintf("utf16SearchOnRegisters: Found on esp stack\n");
+				dprintf("utf16SearchOnRegisters: Found on esp stack\n");
 			}
 			return true;
 		}
@@ -118,7 +118,7 @@ bool utf16SearchOnRegisters(std::wstring searchStr, int len)
 	{
 		if (logginEnabled)
 		{
-			_plugin_logprintf("utf16SearchOnRegisters: Found on register\n");
+			dprintf("utf16SearchOnRegisters: Found on register\n");
 		}
 		return true;
 	}
@@ -130,7 +130,7 @@ bool utf16SearchOnRegisters(std::wstring searchStr, int len)
 		{
 			if (logginEnabled)
 			{
-				_plugin_logprintf("utf16SearchOnRegisters: Found on esp stack\n");
+				dprintf("utf16SearchOnRegisters: Found on esp stack\n");
 			}
 			return true;
 		}
