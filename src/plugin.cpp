@@ -17,67 +17,56 @@ std::wstring stringToWstring(const char* utf8Bytes)
 	return converter.from_bytes(utf8Bytes);
 }
 
-bool utf16Search(ULONG_PTR addr, std::wstring str, int strLen)
+// Recursive func. Example patterns: `&".."` `&L"..."` `L"..."` `""`
+std::string removeReferenceQuotes(std::string str)
+{
+	std::string result = str;
+	if (str[0] == '&' && str[1] == '"' && str[str.length() - 1] == '"')
+	{
+		result = str.substr(2, str.length() - 3);
+		return removeReferenceQuotes(result);
+	}
+	else if (str[0] == '&' && str[1] == 'L' && str[2] == '"' && str[str.length() - 1] == '"')
+	{
+		result = str.substr(3, str.length() - 4);
+		return removeReferenceQuotes(result);
+	}
+	else if (str[0] == '"' && str[str.length() - 1] == '"')
+	{
+		result = str.substr(1, str.length() - 2);
+		return removeReferenceQuotes(result);
+	}
+	else if (str[0] == 'L' && str[1] == '"' && str[str.length() - 1] == '"')
+	{
+		result = str.substr(2, str.length() - 3);
+		return removeReferenceQuotes(result);
+	}
+	return result;
+}
+
+bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, int strLen)
 {
 	if (!DbgMemIsValidReadPtr(addr))
 	{
 		return false;
 	}
 
-
-	//std::wstring addressStr = std::wstring(strLen + 1, L'\0');
-	//if (!DbgMemRead(addr, &addressStr[0], strLen * sizeof(wchar_t)))
-	//{
-	//	dprintf("DbgMemRead failed\n");
-	//	return false;
-	//}
-	//addressStr[strLen] = 0;
-
-	wchar_t* wchar = new wchar_t[strLen];
-	DbgMemRead(addr, wchar, strLen * sizeof(wchar_t));
-
-	wchar_t* nullTerminatedP = new wchar_t[strLen + 1];
-	memcpy(nullTerminatedP, wchar, strLen * sizeof(wchar_t));
-	nullTerminatedP[strLen] = 0;
-
+	std::string userInputStr = std::string(userInputWStr.begin(), userInputWStr.end()); // FIXME: This is not a good solution. It removes non-ascii characters.
 	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
-	if (logginEnabled)
+
+	char* buffer = new char[512];
+	bool strExists = DbgGetStringAt(addr, buffer);
+	if (strExists)
 	{
-		dprintf("utf16Search: addr: %p, str: %ls, nullTerminatedP: %ls\n", addr, str.c_str(), nullTerminatedP);
-	}
-
-	bool result = wcscmp(nullTerminatedP, str.c_str()) == 0;
-	delete[] nullTerminatedP;
-	delete[] wchar;
-
-	if (!result)
-	{
-		// Maybe addr is a pointer to a string. Use DbgMemIsValidReadPtr and DbgMemRead again
-		ULONG_PTR addrP;
-		if (DbgMemRead(addr, &addrP, sizeof(ULONG_PTR)))
-		{
-			if (DbgMemIsValidReadPtr((duint)addrP))
-			{
-				wchar_t* wcharP = new wchar_t[strLen];
-				DbgMemRead((duint)addrP, wcharP, strLen * sizeof(wchar_t));
-
-				wchar_t* nullTerminatedPP = new wchar_t[strLen + 1];
-				memcpy(nullTerminatedPP, wcharP, strLen * sizeof(wchar_t));
-				nullTerminatedPP[strLen] = 0;
-
-				if (logginEnabled)
-				{
-					dprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, str.c_str(), nullTerminatedPP);
-				}
-
-				result = wcscmp(nullTerminatedPP, str.c_str()) == 0;
-				delete[] nullTerminatedPP;
-				delete[] wcharP;
-			}
+		std::string strBuffer = std::string(buffer);
+		if (logginEnabled) {
+			dprintf("utf16Search first iteration: addr: %p, str: %s, strBuffer: %s\n", addr, userInputStr.c_str(), strBuffer.c_str());
 		}
+		std::string strBufferWithoutQuotes = removeReferenceQuotes(strBuffer);
+		return strBufferWithoutQuotes.find(userInputStr) != std::string::npos;
 	}
 
-	return result;
+	return false;
 }
 
 bool utf16SearchOnRegisters(std::wstring searchStr, int len)
