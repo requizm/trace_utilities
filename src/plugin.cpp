@@ -17,32 +17,32 @@ std::wstring stringToWstring(const char* utf8Bytes)
 	return converter.from_bytes(utf8Bytes);
 }
 
-// Recursive func. Example patterns: `&".."` `&L"..."` `L"..."` `""`
-std::string removeReferenceQuotes(std::string str)
-{
-	std::string result = str;
-	if (str[0] == '&' && str[1] == '"' && str[str.length() - 1] == '"')
-	{
-		result = str.substr(2, str.length() - 3);
-		return removeReferenceQuotes(result);
-	}
-	else if (str[0] == '&' && str[1] == 'L' && str[2] == '"' && str[str.length() - 1] == '"')
-	{
-		result = str.substr(3, str.length() - 4);
-		return removeReferenceQuotes(result);
-	}
-	else if (str[0] == '"' && str[str.length() - 1] == '"')
-	{
-		result = str.substr(1, str.length() - 2);
-		return removeReferenceQuotes(result);
-	}
-	else if (str[0] == 'L' && str[1] == '"' && str[str.length() - 1] == '"')
-	{
-		result = str.substr(2, str.length() - 3);
-		return removeReferenceQuotes(result);
-	}
-	return result;
-}
+// // Recursive func. Example patterns: `&".."` `&L"..."` `L"..."` `""`
+// std::string removeReferenceQuotes(std::string str)
+// {
+// 	std::string result = str;
+// 	if (str[0] == '&' && str[1] == '"' && str[str.length() - 1] == '"')
+// 	{
+// 		result = str.substr(2, str.length() - 3);
+// 		return removeReferenceQuotes(result);
+// 	}
+// 	else if (str[0] == '&' && str[1] == 'L' && str[2] == '"' && str[str.length() - 1] == '"')
+// 	{
+// 		result = str.substr(3, str.length() - 4);
+// 		return removeReferenceQuotes(result);
+// 	}
+// 	else if (str[0] == '"' && str[str.length() - 1] == '"')
+// 	{
+// 		result = str.substr(1, str.length() - 2);
+// 		return removeReferenceQuotes(result);
+// 	}
+// 	else if (str[0] == 'L' && str[1] == '"' && str[str.length() - 1] == '"')
+// 	{
+// 		result = str.substr(2, str.length() - 3);
+// 		return removeReferenceQuotes(result);
+// 	}
+// 	return result;
+// }
 
 BOOL changeMemoryPageProtection(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, PDWORD lpflOldProtect) {
     return VirtualProtectEx(hProcess, lpAddress, dwSize, PAGE_EXECUTE_READWRITE, lpflOldProtect);
