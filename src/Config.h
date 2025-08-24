@@ -55,7 +55,7 @@ struct Config
 
     // utf16 search
 	bool utf16SearchEnabled = false;
-	std::wstring utf16SearchText = std::wstring(256, L'\0');
+	std::wstring utf16SearchText;
 	bool utf16SearchRegistersEnabled = false;
 
 	// utf16 search on memory
@@ -64,7 +64,7 @@ struct Config
 	ULONG_PTR utf16MemorySize = 0;
 };
 
-void saveConfig(Config config);
+void saveConfig(const Config& config);
 Config loadConfig();
 
 

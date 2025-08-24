@@ -9,191 +9,95 @@
 
 std::wstring stringToWstring(const char* utf8Bytes)
 {
-	// setup converter
-	using convert_type = std::codecvt_utf8<typename std::wstring::value_type>;
-	std::wstring_convert<convert_type, typename std::wstring::value_type> converter;
-
-	// use converter (.to_bytes: wstr->str, .from_bytes: str->wstr)
-	return converter.from_bytes(utf8Bytes);
+	int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8Bytes, -1, NULL, 0);
+	if (wlen == 0)
+		return {};
+	std::wstring wstr(wlen - 1, 0);
+	MultiByteToWideChar(CP_UTF8, 0, utf8Bytes, -1, &wstr[0], wlen);
+	return wstr;
 }
 
-// // Recursive func. Example patterns: `&".."` `&L"..."` `L"..."` `""`
-// std::string removeReferenceQuotes(std::string str)
-// {
-// 	std::string result = str;
-// 	if (str[0] == '&' && str[1] == '"' && str[str.length() - 1] == '"')
-// 	{
-// 		result = str.substr(2, str.length() - 3);
-// 		return removeReferenceQuotes(result);
-// 	}
-// 	else if (str[0] == '&' && str[1] == 'L' && str[2] == '"' && str[str.length() - 1] == '"')
-// 	{
-// 		result = str.substr(3, str.length() - 4);
-// 		return removeReferenceQuotes(result);
-// 	}
-// 	else if (str[0] == '"' && str[str.length() - 1] == '"')
-// 	{
-// 		result = str.substr(1, str.length() - 2);
-// 		return removeReferenceQuotes(result);
-// 	}
-// 	else if (str[0] == 'L' && str[1] == '"' && str[str.length() - 1] == '"')
-// 	{
-// 		result = str.substr(2, str.length() - 3);
-// 		return removeReferenceQuotes(result);
-// 	}
-// 	return result;
-// }
-
-BOOL changeMemoryPageProtection(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, PDWORD lpflOldProtect) {
-    return VirtualProtectEx(hProcess, lpAddress, dwSize, PAGE_EXECUTE_READWRITE, lpflOldProtect);
-}
-
-bool readProcessMemoryWideString(HANDLE hProcess, LPCVOID lpBaseAddress, LPVOID lpBuffer, SIZE_T nSize, SIZE_T* lpNumberOfBytesRead) {
-    MEMORY_BASIC_INFORMATION mbi;
-    SIZE_T bytesRead =   0;
-    SIZE_T totalBytesRead =   0;
-
-    while (totalBytesRead < nSize) {
-        if (!VirtualQueryEx(hProcess, (LPVOID)(totalBytesRead + (SIZE_T)lpBaseAddress), &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
-            // Handle error querying memory information
-            DisplayError(TEXT("VirtualQueryEx"));
-            break;
-        }
-
-        DWORD oldProtect;
-        if (!changeMemoryPageProtection(hProcess, mbi.BaseAddress, mbi.RegionSize, &oldProtect)) {
-            // Handle error changing memory protection
-            DisplayError(TEXT("changeMemoryPageProtection"));
-            break;
-        }
-
-        SIZE_T bytesToRead = min(nSize - totalBytesRead, mbi.RegionSize);
-        if (!ReadProcessMemory(hProcess, (LPVOID)(totalBytesRead + (SIZE_T)lpBaseAddress), (LPVOID)((SIZE_T)lpBuffer + totalBytesRead), bytesToRead, &bytesRead)) {
-            // Handle error reading the memory
-            DisplayError(TEXT("ReadProcessMemory"));
-            break;
-        }
-
-        totalBytesRead += bytesRead;
-
-        // Restore the original memory protection
-        if (!VirtualProtectEx(hProcess, mbi.BaseAddress, mbi.RegionSize, oldProtect, &oldProtect)) {
-            // Handle error restoring memory protection
-            DisplayError(TEXT("VirtualProtectEx"));
-            break;
-        }
-    }
-
-    *lpNumberOfBytesRead = totalBytesRead;
-    return totalBytesRead >   0;
-}
-
-
-bool searchMemoryForString(std::wstring& searchString) {
-	// TODO: Do not open the process each time, open when trace_into or trace_over is called
-    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DbgGetProcessId());
-    if (!hProcess) {
-        // Failed to open the process
-		DisplayError(TEXT("OpenProcess"));
-        return false;
-    }
-
+bool searchMemoryForString(const std::wstring& searchString) {
 	StateManager& stateManager = StateManager::getInstance();
-	bool logginEnabled = stateManager.getConfig().loggingEnabled;
+	const auto& config = stateManager.getConfig();
+	bool logginEnabled = config.loggingEnabled;
 
 
-	LPCVOID startAddress = (LPCVOID)stateManager.getConfig().utf16MemoryAddress;
-	SIZE_T size = stateManager.getConfig().utf16MemorySize;
+	auto startAddress = (duint)config.utf16MemoryAddress;
+	SIZE_T size = config.utf16MemorySize;
 
 	if (logginEnabled)
 	{
 		dprintf("searchMemoryForString: addr: %p, size: %p\n", startAddress, size);
 	}
 
-    // Convert the search string to a vector of wchar_t for comparison
-    std::vector<wchar_t> searchVector(searchString.begin(), searchString.end());
+	// Buffer to hold the memory contents
+	std::vector<wchar_t> buffer(size / sizeof(wchar_t));
 
+	// Read the memory from the process
+	if (!DbgMemRead(startAddress, buffer.data(), size)) {
+		return false;
+	}
 
-    // Buffer to hold the memory contents
-    std::vector<wchar_t> buffer(size / sizeof(wchar_t));
+	// Use std::search to find the sequence in the memory range
+	auto found = std::search(buffer.begin(), buffer.end(), searchString.begin(), searchString.end());
 
-    // Read the memory from the process
-    SIZE_T bytesRead;
-    if (!readProcessMemoryWideString(hProcess, startAddress, buffer.data(), size, &bytesRead)) {
-        CloseHandle(hProcess);
-        return false;
-    }
-
-    // Use std::search to find the sequence in the memory range
-    auto found = std::search(buffer.begin(), buffer.end(), searchVector.begin(), searchVector.end());
-
-    // Close the process handle
-    CloseHandle(hProcess);
-
-    // Check if the sequence was found
-    bool foundBool = found != buffer.end();
+	// Check if the sequence was found
+	bool foundBool = found != buffer.end();
 	if (foundBool) {
-		dprintf("Found the string on the address: %p\n", stateManager.getConfig().utf16MemoryAddress + (found - buffer.begin()));
+		dprintf("Found the string on the address: %p\n", (void*)(startAddress + (found - buffer.begin()) * sizeof(wchar_t)));
 	}
 
 	return foundBool;
 }
 
 // Why not DbgGetStringAt? Because I tried to it crashes in somewhere and I don't know why!
-bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, bool pointer = true)
+bool utf16Search(duint addr, const std::wstring& userInputWStr, bool pointer = true)
 {
 	if (!DbgMemIsValidReadPtr(addr))
 	{
 		return false;
 	}
-	int strLen = userInputWStr.length();
+	const auto strLen = userInputWStr.length();
+	const auto bufSize = (strLen + 1) * sizeof(wchar_t);
+	std::vector<wchar_t> buffer(strLen + 1);
 
-	wchar_t* wchar = new wchar_t[strLen];
-	DbgMemRead(addr, wchar, strLen * sizeof(wchar_t));
+	if (!DbgMemRead(addr, buffer.data(), strLen * sizeof(wchar_t)))
+		return false;
 
-	wchar_t* nullTerminatedP = new wchar_t[strLen + 1];
-	memcpy(nullTerminatedP, wchar, strLen * sizeof(wchar_t));
-	nullTerminatedP[strLen] = 0;
+	buffer[strLen] = L'\0';
 
 	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
 	if (logginEnabled)
 	{
-		dprintf("utf16Search: addr: %p, str: %ls, nullTerminatedP: %ls\n", addr, userInputWStr.c_str(), nullTerminatedP);
+		dprintf("utf16Search: addr: %p, str: %ls, buffer: %ls\n", addr, userInputWStr.c_str(), buffer.data());
 	}
 
-	bool result = wcscmp(nullTerminatedP, userInputWStr.c_str()) == 0;
-	delete[] nullTerminatedP;
-	delete[] wchar;
-	if (result)
-	{
+	if (wcscmp(buffer.data(), userInputWStr.c_str()) == 0) {
+		dprintf("utf16Search found match: addr: %p, str: %ls, buffer: %ls\n", addr, userInputWStr.c_str(), buffer.data());
 		return true;
 	}
 
 	// Maybe addr is a pointer to a string. Use DbgMemIsValidReadPtr and DbgMemRead again
 	if (pointer)
 	{
-		ULONG_PTR addrP;
-		if (DbgMemRead(addr, &addrP, sizeof(ULONG_PTR)))
+		duint addrP = 0;
+		if (DbgMemRead(addr, &addrP, sizeof(addrP)))
 		{
-			if (DbgMemIsValidReadPtr((duint)addrP))
+			if (DbgMemIsValidReadPtr(addrP))
 			{
-				wchar_t* wcharP = new wchar_t[strLen];
-				DbgMemRead((duint)addrP, wcharP, strLen * sizeof(wchar_t));
+				if (!DbgMemRead(addrP, buffer.data(), strLen * sizeof(wchar_t)))
+					return false;
 
-				wchar_t* nullTerminatedPP = new wchar_t[strLen + 1];
-				memcpy(nullTerminatedPP, wcharP, strLen * sizeof(wchar_t));
-				nullTerminatedPP[strLen] = 0;
+				buffer[strLen] = L'\0';
 
 				if (logginEnabled)
 				{
-					dprintf("utf16Search second iteration: addrP: %p, str: %ls, nullTerminatedPP: %ls\n", addrP, userInputWStr.c_str(), nullTerminatedPP);
+					dprintf("utf16Search second iteration: addrP: %p, str: %ls, buffer: %ls\n", addrP, userInputWStr.c_str(), buffer.data());
 				}
 
-				result = wcscmp(nullTerminatedPP, userInputWStr.c_str()) == 0;
-				delete[] nullTerminatedPP;
-				delete[] wcharP;
-				if (result)
-				{
+				if (wcscmp(buffer.data(), userInputWStr.c_str()) == 0) {
+					dprintf("utf16Search found match: addrP: %p, str: %ls, buffer: %ls\n", addrP, userInputWStr.c_str(), buffer.data());
 					return true;
 				}
 			}
@@ -203,42 +107,40 @@ bool utf16Search(ULONG_PTR addr, std::wstring userInputWStr, bool pointer = true
 	return false;
 }
 
-bool utf16SearchOnRegisters(std::wstring searchStr)
+bool utf16SearchOnRegisters(const std::wstring& searchStr)
 {
 	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
 
 	REGDUMP regdump;
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
 
-	auto& r = regdump.regcontext;
-	// Check each register
-	if (utf16Search(r.cax, searchStr) || utf16Search(r.cbx, searchStr) || utf16Search(r.ccx, searchStr) || utf16Search(r.cdx, searchStr) || utf16Search(r.csi, searchStr) || utf16Search(r.cdi, searchStr) || utf16Search(r.cip, searchStr) || utf16Search(r.csp, searchStr) || utf16Search(r.cbp, searchStr))
-	{
-		if (logginEnabled)
-		{
-			dprintf("utf16SearchOnRegisters: Found on register\n");
+	const auto& r = regdump.regcontext;
+	const std::pair<const char*, duint> registers[] = {
+		{"cax", r.cax}, {"cbx", r.cbx}, {"ccx", r.ccx}, {"cdx", r.cdx},
+		{"csi", r.csi}, {"cdi", r.cdi}, {"cip", r.cip}, {"csp", r.csp},
+		{"cbp", r.cbp}
+	};
+
+	for (const auto& reg : registers) {
+		if (utf16Search(reg.second, searchStr)) {
+			dprintf("utf16SearchOnRegisters: Found on register %s\n", reg.first);
+			return true;
 		}
-		return true;
 	}
 
 	duint esp = r.csp;
 	duint ebp = r.cbp;
-	for (duint i = 0; i < 0x30; i += 0x4)
+	for (duint i = 0; i < 0x30; i += sizeof(duint))
 	{
-		if (utf16Search(esp + i, searchStr))
+		duint currentStackAddress = 0;
+		if (DbgMemRead(esp + i, &currentStackAddress, sizeof(currentStackAddress)) && utf16Search(currentStackAddress, searchStr, false))
 		{
-			if (logginEnabled)
-			{
-				dprintf("utf16SearchOnRegisters: Found on esp stack\n");
-			}
+			dprintf("utf16SearchOnRegisters: Found on stack at [esp+%X]\n", i);
 			return true;
 		}
-		if (utf16Search(ebp + i, searchStr))
+		if (DbgMemRead(ebp + i, &currentStackAddress, sizeof(currentStackAddress)) && utf16Search(currentStackAddress, searchStr, false))
 		{
-			if (logginEnabled)
-			{
-				dprintf("utf16SearchOnRegisters: Found on ebp stack\n");
-			}
+			dprintf("utf16SearchOnRegisters: Found on stack at [ebp+%X]\n", i);
 			return true;
 		}
 	}
@@ -268,13 +170,12 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct)
 {
 	_plugin_registercommand(pluginHandle, PLUGIN_NAME, utf16SearchCommand, true);
 
-	std::wstring apiFile = std::wstring(MAX_PATH, L'\0');
-	GetModuleFileNameW(StateManager::getInstance().getHInstance(), &apiFile[0], apiFile.size());
+	std::wstring apiFile(MAX_PATH, L'\0');
+	apiFile.resize(GetModuleFileNameW(StateManager::getInstance().getHInstance(), &apiFile[0], MAX_PATH));
 	std::filesystem::path filePath(apiFile);
 	filePath.remove_filename();
 	filePath /= std::wstring(DOWIDEN(PLUGIN_NAME)) + L".ini";
-	apiFile = filePath.wstring();
-	StateManager::getInstance().setApiFile(apiFile);
+	StateManager::getInstance().setApiFile(filePath.wstring());
 	loadConfig();
 
 	// Return false to cancel loading the plugin.
@@ -308,27 +209,26 @@ PLUG_EXPORT CDECL void CBMENUENTRY(CBTYPE cbType, void* callbackInfo)
 PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info)
 {
 	StateManager& stateManager = StateManager::getInstance();
-	if (!stateManager.getConfig().utf16SearchEnabled)
+	const auto& config = stateManager.getConfig();
+	if (!config.utf16SearchEnabled)
 	{
 		return;
 	}
 
-	std::wstring searchStr = stateManager.getConfig().utf16SearchText;
+	const auto& searchStr = config.utf16SearchText;
 
-	if (stateManager.getConfig().utf16SearchRegistersEnabled)
+	if (config.utf16SearchRegistersEnabled)
 	{
-		bool foundInRegisters = utf16SearchOnRegisters(searchStr);
-		if (foundInRegisters)
+		if (utf16SearchOnRegisters(searchStr))
 		{
 			info->stop = true;
 			return;
 		}
 	}
 
-	if (stateManager.getConfig().utf16MemoryEnabled)
+	if (config.utf16MemoryEnabled)
 	{
-		bool foundInMemory = searchMemoryForString(searchStr);
-		if (foundInMemory)
+		if (searchMemoryForString(searchStr))
 		{
 			info->stop = true;
 			return;
