@@ -23,6 +23,7 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		SetDlgItemTextW(hwndDlg, TRACE_T_SEARCH, config.utf16SearchText.c_str());
 		CheckDlgButton(hwndDlg, TRACE_C_ENABLED, config.utf16SearchEnabled ? BST_CHECKED : BST_UNCHECKED);
 		CheckDlgButton(hwndDlg, TRACE_C_REGISTERS, config.utf16SearchRegistersEnabled ? BST_CHECKED : BST_UNCHECKED);
+		CheckDlgButton(hwndDlg, TRACE_C_STACK, config.utf16SearchStackEnabled ? BST_CHECKED : BST_UNCHECKED);
 		CheckDlgButton(hwndDlg, TRACE_C_CASESENSITIVE, config.utf16SearchCaseSensitive ? BST_CHECKED : BST_UNCHECKED);
 
 		if (config.utf16SearchModeContains)
@@ -54,6 +55,7 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 			config.utf16SearchEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_ENABLED) == BST_CHECKED;
 			config.utf16SearchRegistersEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_REGISTERS) == BST_CHECKED;
+			config.utf16SearchStackEnabled = IsDlgButtonChecked(hwndDlg, TRACE_C_STACK) == BST_CHECKED;
 			config.utf16SearchCaseSensitive = IsDlgButtonChecked(hwndDlg, TRACE_C_CASESENSITIVE) == BST_CHECKED;
 			config.utf16SearchModeContains = IsDlgButtonChecked(hwndDlg, TRACE_R_CONTAINS) == BST_CHECKED;
 

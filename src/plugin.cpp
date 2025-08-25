@@ -180,7 +180,7 @@ bool utf16Search(duint addr, const std::wstring& userInputWStr, bool pointer = t
 	return false;
 }
 
-bool utf16SearchOnRegisters(const std::wstring& searchStr)
+bool searchOnRegisters(const std::wstring& searchStr)
 {
 	REGDUMP regdump;
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
@@ -194,10 +194,18 @@ bool utf16SearchOnRegisters(const std::wstring& searchStr)
 
 	for (const auto& reg : registers) {
 		if (utf16Search(reg.second, searchStr)) {
-			dprintf("utf16SearchOnRegisters: Found on register %s\n", reg.first);
+			dprintf("searchOnRegisters: Found on register %s\n", reg.first);
 			return true;
 		}
 	}
+	return false;
+}
+
+bool searchOnStack(const std::wstring& searchStr)
+{
+	REGDUMP regdump;
+	DbgGetRegDumpEx(&regdump, sizeof(regdump));
+	const auto& r = regdump.regcontext;
 
 	duint esp = r.csp;
 	duint ebp = r.cbp;
@@ -206,12 +214,12 @@ bool utf16SearchOnRegisters(const std::wstring& searchStr)
 		duint currentStackAddress = 0;
 		if (DbgMemRead(esp + i, &currentStackAddress, sizeof(currentStackAddress)) && utf16Search(currentStackAddress, searchStr, false))
 		{
-			dprintf("utf16SearchOnRegisters: Found on stack at [esp+%X]\n", i);
+			dprintf("searchOnStack: Found on stack at [esp+%X]\n", i);
 			return true;
 		}
 		if (DbgMemRead(ebp + i, &currentStackAddress, sizeof(currentStackAddress)) && utf16Search(currentStackAddress, searchStr, false))
 		{
-			dprintf("utf16SearchOnRegisters: Found on stack at [ebp+%X]\n", i);
+			dprintf("searchOnStack: Found on stack at [ebp+%X]\n", i);
 			return true;
 		}
 	}
@@ -223,14 +231,16 @@ static bool utf16SearchCommand(int argc, char** argv)
 {
 	if (argc < 2)
 	{
-		dputs("Usage: " PLUGIN_NAME "searchStrUtf16");
+		dputs("Usage: " PLUGIN_NAME " searchStrUtf16");
 		return false;
 	}
 
 	std::wstring searchStr = stringToWstring(argv[1]);
-	int len = searchStr.length();
+	
+	if (searchOnRegisters(searchStr)) return true;
+	if (searchOnStack(searchStr)) return true;
 
-	return utf16SearchOnRegisters(searchStr);
+	return false;
 }
 
 #define EXPAND(x) L##x
@@ -290,7 +300,16 @@ PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info)
 
 	if (config.utf16SearchRegistersEnabled)
 	{
-		if (utf16SearchOnRegisters(searchStr))
+		if (searchOnRegisters(searchStr))
+		{
+			info->stop = true;
+			return;
+		}
+	}
+    
+	if (config.utf16SearchStackEnabled)
+	{
+		if (searchOnStack(searchStr))
 		{
 			info->stop = true;
 			return;

@@ -57,6 +57,7 @@ struct Config
 	bool utf16SearchEnabled = false;
 	std::wstring utf16SearchText;
 	bool utf16SearchRegistersEnabled = false;
+	bool utf16SearchStackEnabled = false;
 	bool utf16SearchCaseSensitive = false;
 	bool utf16SearchModeContains = true; // true = contains, false = equals
 
