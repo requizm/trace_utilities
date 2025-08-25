@@ -17,6 +17,9 @@
 #define TRACE_T_SEARCH                  1012
 #define TRACE_L_SEARCH                  1013
 #define IDC_CHECK1                      1014
+#define TRACE_C_CASESENSITIVE           1015
+#define TRACE_R_CONTAINS                1016
+#define TRACE_R_EQUALS                  1017
 #define TRACE_L_UTF16                   -1
 
 // Next default values for new objects
@@ -25,7 +28,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        107
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1015
+#define _APS_NEXT_CONTROL_VALUE         1018
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

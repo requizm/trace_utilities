@@ -4,8 +4,10 @@
 #include "ManagerDialog.h"
 #include "Config.h"
 #include <filesystem>
-#include <codecvt>
-#include <locale>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <cwctype>
 
 std::wstring stringToWstring(const char* utf8Bytes)
 {
@@ -20,61 +22,144 @@ std::wstring stringToWstring(const char* utf8Bytes)
 bool searchMemoryForString(const std::wstring& searchString) {
 	StateManager& stateManager = StateManager::getInstance();
 	const auto& config = stateManager.getConfig();
-	bool logginEnabled = config.loggingEnabled;
+	if (searchString.empty()) return false;
 
+	duint startAddress = config.utf16MemoryAddress;
+	duint totalSize = config.utf16MemorySize;
 
-	auto startAddress = (duint)config.utf16MemoryAddress;
-	SIZE_T size = config.utf16MemorySize;
-
-	if (logginEnabled)
-	{
-		dprintf("searchMemoryForString: addr: %p, size: %p\n", startAddress, size);
+	// Prepare the search term based on the mode.
+	// For "Equals" mode, we search for the exact string followed by a null terminator.
+	std::wstring effectiveSearchString = searchString;
+	if (!config.utf16SearchModeContains) {
+		effectiveSearchString += L'\0';
 	}
 
-	// Buffer to hold the memory contents
-	std::vector<wchar_t> buffer(size / sizeof(wchar_t));
+	duint searchStrBytes = effectiveSearchString.length() * sizeof(wchar_t);
+	if (searchStrBytes == 0) return false;
 
-	// Read the memory from the process
-	if (!DbgMemRead(startAddress, buffer.data(), size)) {
-		return false;
+	// Scan the memory region in chunks for performance and to handle large regions.
+	const duint CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks
+	std::vector<wchar_t> buffer(CHUNK_SIZE / sizeof(wchar_t));
+	duint readOffset = 0;
+
+	while (readOffset < totalSize) {
+		duint currentAddress = startAddress + readOffset;
+		duint bytesToRead = min(CHUNK_SIZE, totalSize - readOffset);
+
+		if (config.loggingEnabled) {
+			dprintf("Scanning chunk at %p, size %p\n", (void*)currentAddress, (void*)bytesToRead);
+		}
+
+		// Don't bother reading if the remaining block is smaller than our search term
+		if (bytesToRead < searchStrBytes) {
+			break;
+		}
+
+		if (!DbgMemRead(currentAddress, buffer.data(), bytesToRead)) {
+			// Skip unreadable pages by jumping to the next page boundary
+			duint nextPage = (currentAddress / 4096 + 1) * 4096;
+			readOffset = (nextPage > currentAddress) ? (nextPage - startAddress) : (readOffset + 4096);
+			continue;
+		}
+		
+		size_t bufferLen = bytesToRead / sizeof(wchar_t);
+		auto bufferBegin = buffer.begin();
+		auto bufferEnd = buffer.begin() + bufferLen;
+
+		auto it = bufferEnd;
+		if (config.utf16SearchCaseSensitive) {
+			it = std::search(bufferBegin, bufferEnd, effectiveSearchString.begin(), effectiveSearchString.end());
+		} else {
+			it = std::search(bufferBegin, bufferEnd, effectiveSearchString.begin(), effectiveSearchString.end(),
+				[](wchar_t ch1, wchar_t ch2) { return std::towlower(ch1) == std::towlower(ch2); });
+		}
+
+		if (it != bufferEnd) {
+			duint foundAddress = currentAddress + (std::distance(bufferBegin, it) * sizeof(wchar_t));
+			dprintf("Found the string at address: %p\n", (void*)foundAddress);
+			return true;
+		}
+
+		// To avoid missing a match that spans a chunk boundary, we overlap the reads
+		// by the length of the search string, minus one character for efficiency.
+		if (readOffset + bytesToRead < totalSize) {
+			readOffset += bytesToRead - (searchStrBytes > sizeof(wchar_t) ? searchStrBytes - sizeof(wchar_t) : 0);
+		} else {
+			readOffset += bytesToRead;
+		}
 	}
 
-	// Use std::search to find the sequence in the memory range
-	auto found = std::search(buffer.begin(), buffer.end(), searchString.begin(), searchString.end());
-
-	// Check if the sequence was found
-	bool foundBool = found != buffer.end();
-	if (foundBool) {
-		dprintf("Found the string on the address: %p\n", (void*)(startAddress + (found - buffer.begin()) * sizeof(wchar_t)));
-	}
-
-	return foundBool;
+	return false;
 }
 
-// Why not DbgGetStringAt? Because I tried to it crashes in somewhere and I don't know why!
-bool utf16Search(duint addr, const std::wstring& userInputWStr, bool pointer = true)
+
+// This function checks if an address contains a UTF-16 string that matches user input
+// based on current settings (contains/equals, case-sensitive).
+bool utf16SearchAt(duint addr, const std::wstring& userInputWStr)
 {
 	if (!DbgMemIsValidReadPtr(addr))
 	{
 		return false;
 	}
-	const auto strLen = userInputWStr.length();
-	const auto bufSize = (strLen + 1) * sizeof(wchar_t);
-	std::vector<wchar_t> buffer(strLen + 1);
 
-	if (!DbgMemRead(addr, buffer.data(), strLen * sizeof(wchar_t)))
-		return false;
+	StateManager& stateManager = StateManager::getInstance();
+	const auto& config = stateManager.getConfig();
 
-	buffer[strLen] = L'\0';
-
-	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
-	if (logginEnabled)
+	// Read a reasonable amount of memory to capture a potentially null-terminated string.
+	// This is a heuristic for checking registers/stack, not for full memory scans.
+	const size_t max_read_len = 512;
+	std::vector<wchar_t> buffer(max_read_len);
+	if (!DbgMemRead(addr, buffer.data(), max_read_len * sizeof(wchar_t)))
 	{
-		dprintf("utf16Search: addr: %p, str: %ls, buffer: %ls\n", addr, userInputWStr.c_str(), buffer.data());
+		return false;
+	}
+	buffer.back() = L'\0'; // Ensure null-termination for safety
+
+	std::wstring memStr(buffer.data()); // Creates string up to first null character
+
+	if (config.loggingEnabled)
+	{
+		dprintf("utf16SearchAt: addr: %p, searching for '%ls' in '%ls'\n", (void*)addr, userInputWStr.c_str(), memStr.c_str());
 	}
 
-	if (wcscmp(buffer.data(), userInputWStr.c_str()) == 0) {
-		dprintf("utf16Search found match: addr: %p, str: %ls, buffer: %ls\n", addr, userInputWStr.c_str(), buffer.data());
+	std::wstring haystack = memStr;
+	std::wstring needle = userInputWStr;
+
+	if (!config.utf16SearchCaseSensitive)
+	{
+		std::transform(haystack.begin(), haystack.end(), haystack.begin(), ::towlower);
+		std::transform(needle.begin(), needle.end(), needle.begin(), ::towlower);
+	}
+
+	bool match = false;
+	if (config.utf16SearchModeContains)
+	{
+		if (haystack.find(needle) != std::wstring::npos)
+		{
+			match = true;
+		}
+	}
+	else // Equals mode
+	{
+		if (haystack == needle)
+		{
+			match = true;
+		}
+	}
+
+	if (match)
+	{
+		dprintf("utf16Search: Found match at address %p. User string: '%ls', Memory string: '%ls'\n", (void*)addr, userInputWStr.c_str(), memStr.c_str());
+	}
+
+	return match;
+}
+
+// This function checks an address, and if it's a pointer, it checks the pointed-to address.
+bool utf16Search(duint addr, const std::wstring& userInputWStr, bool pointer = true)
+{
+	if (utf16SearchAt(addr, userInputWStr))
+	{
 		return true;
 	}
 
@@ -84,22 +169,10 @@ bool utf16Search(duint addr, const std::wstring& userInputWStr, bool pointer = t
 		duint addrP = 0;
 		if (DbgMemRead(addr, &addrP, sizeof(addrP)))
 		{
-			if (DbgMemIsValidReadPtr(addrP))
+			if (utf16SearchAt(addrP, userInputWStr))
 			{
-				if (!DbgMemRead(addrP, buffer.data(), strLen * sizeof(wchar_t)))
-					return false;
-
-				buffer[strLen] = L'\0';
-
-				if (logginEnabled)
-				{
-					dprintf("utf16Search second iteration: addrP: %p, str: %ls, buffer: %ls\n", addrP, userInputWStr.c_str(), buffer.data());
-				}
-
-				if (wcscmp(buffer.data(), userInputWStr.c_str()) == 0) {
-					dprintf("utf16Search found match: addrP: %p, str: %ls, buffer: %ls\n", addrP, userInputWStr.c_str(), buffer.data());
-					return true;
-				}
+				dprintf("Found via pointer at %p -> %p\n", (void*)addr, (void*)addrP);
+				return true;
 			}
 		}
 	}
@@ -109,8 +182,6 @@ bool utf16Search(duint addr, const std::wstring& userInputWStr, bool pointer = t
 
 bool utf16SearchOnRegisters(const std::wstring& searchStr)
 {
-	bool logginEnabled = StateManager::getInstance().getConfig().loggingEnabled;
-
 	REGDUMP regdump;
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
 
@@ -210,7 +281,7 @@ PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info)
 {
 	StateManager& stateManager = StateManager::getInstance();
 	const auto& config = stateManager.getConfig();
-	if (!config.utf16SearchEnabled)
+	if (!config.utf16SearchEnabled || config.utf16SearchText.empty())
 	{
 		return;
 	}
