@@ -186,11 +186,23 @@ bool searchOnRegisters(const std::wstring& searchStr)
 	DbgGetRegDumpEx(&regdump, sizeof(regdump));
 
 	const auto& r = regdump.regcontext;
+
+#ifdef _WIN64
 	const std::pair<const char*, duint> registers[] = {
-		{"cax", r.cax}, {"cbx", r.cbx}, {"ccx", r.ccx}, {"cdx", r.cdx},
-		{"csi", r.csi}, {"cdi", r.cdi}, {"cip", r.cip}, {"csp", r.csp},
-		{"cbp", r.cbp}
+		{"rax", r.cax}, {"rbx", r.cbx}, {"rcx", r.ccx}, {"rdx", r.cdx},
+		{"rsi", r.csi}, {"rdi", r.cdi}, {"rip", r.cip}, {"rsp", r.csp},
+		{"rbp", r.cbp}, {"r8", r.r8},   {"r9", r.r9},   {"r10", r.r10},
+		{"r11", r.r11}, {"r12", r.r12}, {"r13", r.r13}, {"r14", r.r14},
+		{"r15", r.r15}
 	};
+#else
+	const std::pair<const char*, duint> registers[] = {
+		{"eax", r.cax}, {"ebx", r.cbx}, {"ecx", r.ccx}, {"edx", r.cdx},
+		{"esi", r.csi}, {"edi", r.cdi}, {"eip", r.cip}, {"esp", r.csp},
+		{"ebp", r.cbp}
+	};
+#endif // _WIN64
+
 
 	for (const auto& reg : registers) {
 		if (utf16Search(reg.second, searchStr)) {
